@@ -1,0 +1,20 @@
+{
+  "dataset": "multimodal_dementia_dataset.csv",
+  "n_patients": 225,
+  "n_features_total": 27,
+  "n_features_per_mod": {
+    "clinical": 5,
+    "mri": 4,
+    "speech": 18
+  },
+  "pca_components": 2,
+  "qsvm_feature_dim": 6,
+  "svm_acc": 1.0,
+  "qsvm_acc": 1.0,
+  "published_baselines": {
+    "akinrotimi_qsvm_base": 0.9125,
+    "chakravarthi_classical_ref1": 0.942,
+    "so_et_al_clinical_ref7": 0.972,
+    "lin_washington_speech_ref6": 0.84
+  }
+}
