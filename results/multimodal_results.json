@@ -1,5 +1,5 @@
 {
-  "dataset": "multimodal_dementia_dataset.csv",
+  "dataset": "multimodal_dementia_dataset.csv (synthetic)",
   "n_patients": 225,
   "n_features_total": 27,
   "n_features_per_mod": {
@@ -9,8 +9,32 @@
   },
   "pca_components": 2,
   "qsvm_feature_dim": 6,
-  "svm_acc": 1.0,
-  "qsvm_acc": 1.0,
+  "cv_folds": 5,
+  "clean_cv": {
+    "svm": {
+      "mean": 1.0,
+      "std": 0.0
+    },
+    "qsvm": {
+      "mean": 0.9911,
+      "std": 0.0178
+    }
+  },
+  "noisy_cv": {
+    "svm": {
+      "mean": 0.9422,
+      "std": 0.0301
+    },
+    "qsvm": {
+      "mean": 0.8667,
+      "std": 0.0562
+    }
+  },
+  "noise_config": {
+    "sigma_frac": 1.5,
+    "scaling": "per-feature std (X[:,j] += N(0, sigma_frac * std_j))",
+    "note": "noise applied to synthetic training data only \u2014 do not apply to real inference"
+  },
   "published_baselines": {
     "akinrotimi_qsvm_base": 0.9125,
     "chakravarthi_classical_ref1": 0.942,
