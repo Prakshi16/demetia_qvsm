@@ -33,7 +33,6 @@ env/
 .DS_Store
 Thumbs.db
 
-# Claude Code                                                              
 .claude/
 
 TO_build_phase_1_revised.md  
