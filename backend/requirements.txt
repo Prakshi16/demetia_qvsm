@@ -1,0 +1,25 @@
+# --- Web framework ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20        # multipart form parsing for file uploads
+
+# --- Database ---
+sqlalchemy==2.0.36
+psycopg2-binary==2.9.10         # Postgres driver (Supabase)
+pydantic-settings==2.7.1        # env-var settings
+
+# --- Auth ---
+python-jose[cryptography]==3.3.0  # JWT sign/verify
+passlib[bcrypt]==1.7.4            # password hashing
+bcrypt==4.2.1                    # pinned: passlib 1.7.4 breaks on bcrypt>=4.3
+
+# --- Supabase storage client (upload endpoints, later pass) ---
+supabase==2.11.0
+
+# --- ML serving: pinned to the versions the Phase 1 pickle was built with, so
+# results/qsvm_model.pkl loads and predicts identically server-side. ---
+numpy==2.2.6
+scipy==1.15.3
+scikit-learn==1.7.2
+qiskit==2.4.1
+qiskit-machine-learning==0.9.0

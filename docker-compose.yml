@@ -1,0 +1,18 @@
+# One command for the whole team to run the exact same backend locally:
+#   docker compose up --build
+# Postgres is NOT containerized — the DB stays on remote Supabase (§8); the
+# container only needs outbound network to reach it.
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env          # gitignored; each teammate copies backend/.env.example
+    volumes:
+      - ./backend:/app          # live code reload in dev
+      - ./results:/model:ro     # Phase 1 pickle, read-only (wired into serving later)
+    # --reload picks up code edits without rebuilding the image.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

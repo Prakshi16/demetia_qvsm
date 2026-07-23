@@ -35,4 +35,19 @@ Thumbs.db
 
 .claude/
 
-TO_build_phase_1_revised.md  
+TO_build_phase_1_revised.md
+
+# Build specs / internal context — never publish
+TO_build_phase_2.md
+PROJECT_CONTEXT.md
+
+# Env files (any level)
+.env
+.env.*
+!.env.example
+backend/.env
+
+# Node / frontend build output
+node_modules/
+frontend/dist/
+frontend/.vite/
