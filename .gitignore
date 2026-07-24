@@ -40,6 +40,7 @@ TO_build_phase_1_revised.md
 # Build specs / internal context — never publish
 TO_build_phase_2.md
 PROJECT_CONTEXT.md
+HANDOFF_speech_upload.md
 
 # Env files (any level)
 .env
