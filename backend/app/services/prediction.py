@@ -6,6 +6,12 @@ they've stored their feature vector and set their modality status to ``done``.
 When BOTH modalities are done it runs the fused pipeline and moves the visit into
 the clinician's queue (``status='pending_review'``).
 
+Two predictions are produced: the QSVM ("Quantum SVM") result on
+``model_prediction``/``model_confidence`` (the canonical one — agreement_flag
+compares the doctor against it), and a classical SVM result on
+``svm_prediction``/``svm_confidence``, shown alongside it purely for
+research/comparison. The classical SVM feeds no computed field.
+
 =============================================================================
 PLACEHOLDER — the real model glue is the immediately-following pass, not this
 branch. The real ``_run_real_pipeline`` must:
@@ -16,6 +22,8 @@ branch. The real ``_run_real_pipeline`` must:
     CSV and LOG THE R^2 as an approximation — wanted for the report),
   * take confidence from decision_function (QSVC has no predict_proba), labelled
     a margin, not a probability,
+  * produce BOTH the QSVM prediction and a classical SVM prediction (the latter
+    for the display-only comparison) — restructure the return to carry both,
   * NEVER apply SIGMA_FRAC noise at inference,
   * be timed once locally (quantum kernel vs every support vector can be slow;
     if slow, switch this to an async/polling design).
@@ -53,8 +61,13 @@ def check_and_run_prediction(db: Session, visit: Visit) -> bool:
     else:
         prediction, confidence = _placeholder_prediction(visit)
 
+    # QSVM (canonical) result.
     visit.model_prediction = prediction
     visit.model_confidence = confidence
+    # Classical SVM (display-only comparison). The placeholder fills both the same
+    # way; the real pass will run a separate classical SVM to populate these.
+    visit.svm_prediction = prediction
+    visit.svm_confidence = confidence
     visit.status = "pending_review"
     return True
 

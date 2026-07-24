@@ -183,8 +183,10 @@ class VisitDetailOut(BaseModel):
     speech_status: str
     mri_feature_vector: Optional[list] = None
     speech_feature_vector: Optional[list] = None
-    model_prediction: Optional[str] = None
+    model_prediction: Optional[str] = None  # QSVM ("Quantum SVM")
     model_confidence: Optional[float] = None
+    svm_prediction: Optional[str] = None  # classical SVM, display-only comparison
+    svm_confidence: Optional[float] = None
     requires_review: bool
     status: str
     doctor_diagnosis: Optional[str] = None
