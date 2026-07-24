@@ -10,6 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.routers import auth, dashboard, patients, visits
 
 app = FastAPI(title="Cortex Health Portal API", version="0.1.0")
 
@@ -39,5 +40,10 @@ def health(db: Session = Depends(get_db)) -> dict:
     return {"status": "ok", "db": db_state}
 
 
-# Later passes mount their routers here, e.g. api_router.include_router(auth_router).
+# Feature routers (§5). Upload endpoints (Bishal/Sheetal) mount onto visits later.
+api_router.include_router(auth.router)
+api_router.include_router(patients.router)
+api_router.include_router(visits.router)
+api_router.include_router(dashboard.router)
+
 app.include_router(api_router)
