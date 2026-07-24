@@ -151,10 +151,20 @@ class Visit(Base):
     speech_feature_vector: Mapped[list | None] = mapped_column(JSONB, nullable=True)
 
     # --- model output (screening only, filled once all 3 modalities are done) ---
+    # model_prediction / model_confidence hold the QSVM ("Quantum SVM") result —
+    # the canonical prediction that agreement_flag compares the doctor against.
     model_prediction: Mapped[str | None] = mapped_column(
         _enum(*MODEL_PREDICTION, name="model_prediction"), nullable=True
     )
     model_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # svm_prediction / svm_confidence hold the classical SVM result, shown next to
+    # the QSVM one on the visit detail page (labelled "Classical SVM") purely for
+    # research/comparison — this is a capstone demo, not a clinical tool. The
+    # classical SVM feeds NO computed field: agreement_flag stays tied to QSVM only.
+    svm_prediction: Mapped[str | None] = mapped_column(
+        _enum(*MODEL_PREDICTION, name="model_prediction"), nullable=True
+    )
+    svm_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # --- doctor review (screening only) ---
     requires_review: Mapped[bool] = mapped_column(
