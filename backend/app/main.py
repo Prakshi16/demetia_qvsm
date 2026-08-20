@@ -10,7 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.routers import auth, dashboard, patients, visits,speech
+from app.routers import auth, dashboard, patients, visits, speech, mri_upload
 
 app = FastAPI(title="Cortex Health Portal API", version="0.1.0")
 
@@ -45,6 +45,7 @@ api_router.include_router(auth.router)
 api_router.include_router(patients.router)
 api_router.include_router(visits.router)
 api_router.include_router(speech.router)
+api_router.include_router(mri_upload.router)
 api_router.include_router(dashboard.router)
 
 app.include_router(api_router)
