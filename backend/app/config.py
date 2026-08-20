@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_HOURS: int = 24
 
+    # Phase 1 model pickles (qsvm_model.pkl + svm_model.pkl). docker-compose
+    # mounts the repo's ./results here read-only; when running uvicorn directly
+    # this path won't exist and the loader falls back to <repo>/results.
+    MODEL_DIR: str = "/model"
+
     # `.env` lives next to the backend package. In Docker the file is provided via
     # env_file so this path simply won't exist there — that's fine.
     model_config = SettingsConfigDict(

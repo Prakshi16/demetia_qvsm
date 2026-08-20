@@ -35,12 +35,17 @@ Thumbs.db
 
 .claude/
 
-TO_build_phase_1_revised.md
-
-# Build specs / internal context — never publish
-TO_build_phase_2.md
+# Internal working docs — build specs, project context, teammate handoffs.
+# Not part of the deliverable; some carry infrastructure detail we don't publish.
+#
+# These are PATTERNS, not filenames, on purpose: a new spec or handoff is ignored
+# the moment it's created. Listing files one by one meant every new handoff was
+# unprotected until someone remembered to add it — which is one `git add -A` too
+# late. Add new internal docs under these names and they're covered automatically.
+TO_build_*.md
 PROJECT_CONTEXT.md
-HANDOFF_speech_upload.md
+HANDOFF_*.md
+handoff_*.md
 MRI_upload.md
 
 # Env files (any level)

@@ -1,0 +1,1299 @@
+{
+  "source_notebook": "metrics_full.ipynb",
+  "description": "Full metric set for the experiment originally reported in multimodal_results.json",
+  "dataset": "multimodal_dementia_dataset.csv (synthetic)",
+  "n_patients": 225,
+  "positive_class": "Demented (Label == 1)",
+  "cv": "StratifiedKFold(n_splits=5, shuffle=True, random_state=42)",
+  "std_convention": "population std across the 5 folds (ddof=0), matching multimodal_results.json",
+  "roc_auc_source": "decision_function (not predict_proba)",
+  "noise_config": {
+    "sigma_frac": 1.5,
+    "scaling": "per-feature std (X[:,j] += N(0, sigma_frac * std_j))",
+    "seed": 42,
+    "drawn": "once over all 27 features"
+  },
+  "reproduction_check": "PASSED \u2014 fused accuracies and fold-1 confusion matrices match the original run",
+  "runs": {
+    "noisy|clinical|svm": {
+      "data": "noisy",
+      "modality": "clinical",
+      "model": "svm",
+      "n_qubits": null,
+      "metrics": {
+        "accuracy": {
+          "mean": 0.6933,
+          "std": 0.0619
+        },
+        "precision": {
+          "mean": 0.698,
+          "std": 0.0992
+        },
+        "recall": {
+          "mean": 0.5638,
+          "std": 0.0822
+        },
+        "specificity": {
+          "mean": 0.799,
+          "std": 0.0749
+        },
+        "f1": {
+          "mean": 0.6215,
+          "std": 0.0833
+        },
+        "roc_auc": {
+          "mean": 0.7335,
+          "std": 0.0466
+        }
+      },
+      "per_fold": {
+        "accuracy": [
+          0.7111,
+          0.6444,
+          0.6,
+          0.7556,
+          0.7556
+        ],
+        "precision": [
+          0.7059,
+          0.6,
+          0.5714,
+          0.8,
+          0.8125
+        ],
+        "recall": [
+          0.6,
+          0.6,
+          0.4,
+          0.6,
+          0.619
+        ],
+        "specificity": [
+          0.8,
+          0.68,
+          0.76,
+          0.88,
+          0.875
+        ],
+        "f1": [
+          0.6486,
+          0.6,
+          0.4706,
+          0.6857,
+          0.7027
+        ],
+        "roc_auc": [
+          0.728,
+          0.694,
+          0.69,
+          0.736,
+          0.8194
+        ]
+      },
+      "confusion_matrices_per_fold": [
+        [
+          [
+            20,
+            5
+          ],
+          [
+            8,
+            12
+          ]
+        ],
+        [
+          [
+            17,
+            8
+          ],
+          [
+            8,
+            12
+          ]
+        ],
+        [
+          [
+            19,
+            6
+          ],
+          [
+            12,
+            8
+          ]
+        ],
+        [
+          [
+            22,
+            3
+          ],
+          [
+            8,
+            12
+          ]
+        ],
+        [
+          [
+            21,
+            3
+          ],
+          [
+            8,
+            13
+          ]
+        ]
+      ]
+    },
+    "noisy|clinical|qsvm": {
+      "data": "noisy",
+      "modality": "clinical",
+      "model": "qsvm",
+      "n_qubits": 2,
+      "metrics": {
+        "accuracy": {
+          "mean": 0.6978,
+          "std": 0.0537
+        },
+        "precision": {
+          "mean": 0.7104,
+          "std": 0.0613
+        },
+        "recall": {
+          "mean": 0.5343,
+          "std": 0.1218
+        },
+        "specificity": {
+          "mean": 0.8307,
+          "std": 0.0155
+        },
+        "f1": {
+          "mean": 0.6058,
+          "std": 0.1071
+        },
+        "roc_auc": {
+          "mean": 0.7415,
+          "std": 0.0466
+        }
+      },
+      "per_fold": {
+        "accuracy": [
+          0.6889,
+          0.7556,
+          0.6,
+          0.7333,
+          0.7111
+        ],
+        "precision": [
+          0.6875,
+          0.7647,
+          0.6,
+          0.75,
+          0.75
+        ],
+        "recall": [
+          0.55,
+          0.65,
+          0.3,
+          0.6,
+          0.5714
+        ],
+        "specificity": [
+          0.8,
+          0.84,
+          0.84,
+          0.84,
+          0.8333
+        ],
+        "f1": [
+          0.6111,
+          0.7027,
+          0.4,
+          0.6667,
+          0.6486
+        ],
+        "roc_auc": [
+          0.712,
+          0.788,
+          0.678,
+          0.728,
+          0.8016
+        ]
+      },
+      "confusion_matrices_per_fold": [
+        [
+          [
+            20,
+            5
+          ],
+          [
+            9,
+            11
+          ]
+        ],
+        [
+          [
+            21,
+            4
+          ],
+          [
+            7,
+            13
+          ]
+        ],
+        [
+          [
+            21,
+            4
+          ],
+          [
+            14,
+            6
+          ]
+        ],
+        [
+          [
+            21,
+            4
+          ],
+          [
+            8,
+            12
+          ]
+        ],
+        [
+          [
+            20,
+            4
+          ],
+          [
+            9,
+            12
+          ]
+        ]
+      ]
+    },
+    "noisy|mri|svm": {
+      "data": "noisy",
+      "modality": "mri",
+      "model": "svm",
+      "n_qubits": null,
+      "metrics": {
+        "accuracy": {
+          "mean": 0.7867,
+          "std": 0.0725
+        },
+        "precision": {
+          "mean": 0.7628,
+          "std": 0.0841
+        },
+        "recall": {
+          "mean": 0.7729,
+          "std": 0.1012
+        },
+        "specificity": {
+          "mean": 0.799,
+          "std": 0.0904
+        },
+        "f1": {
+          "mean": 0.7641,
+          "std": 0.0779
+        },
+        "roc_auc": {
+          "mean": 0.8653,
+          "std": 0.0739
+        }
+      },
+      "per_fold": {
+        "accuracy": [
+          0.6889,
+          0.7778,
+          0.7556,
+          0.9111,
+          0.8
+        ],
+        "precision": [
+          0.625,
+          0.7273,
+          0.7647,
+          0.8636,
+          0.8333
+        ],
+        "recall": [
+          0.75,
+          0.8,
+          0.65,
+          0.95,
+          0.7143
+        ],
+        "specificity": [
+          0.64,
+          0.76,
+          0.84,
+          0.88,
+          0.875
+        ],
+        "f1": [
+          0.6818,
+          0.7619,
+          0.7027,
+          0.9048,
+          0.7692
+        ],
+        "roc_auc": [
+          0.85,
+          0.796,
+          0.782,
+          0.974,
+          0.9246
+        ]
+      },
+      "confusion_matrices_per_fold": [
+        [
+          [
+            16,
+            9
+          ],
+          [
+            5,
+            15
+          ]
+        ],
+        [
+          [
+            19,
+            6
+          ],
+          [
+            4,
+            16
+          ]
+        ],
+        [
+          [
+            21,
+            4
+          ],
+          [
+            7,
+            13
+          ]
+        ],
+        [
+          [
+            22,
+            3
+          ],
+          [
+            1,
+            19
+          ]
+        ],
+        [
+          [
+            21,
+            3
+          ],
+          [
+            6,
+            15
+          ]
+        ]
+      ]
+    },
+    "noisy|mri|qsvm": {
+      "data": "noisy",
+      "modality": "mri",
+      "model": "qsvm",
+      "n_qubits": 2,
+      "metrics": {
+        "accuracy": {
+          "mean": 0.7733,
+          "std": 0.0775
+        },
+        "precision": {
+          "mean": 0.7735,
+          "std": 0.0945
+        },
+        "recall": {
+          "mean": 0.7038,
+          "std": 0.1109
+        },
+        "specificity": {
+          "mean": 0.8313,
+          "std": 0.0725
+        },
+        "f1": {
+          "mean": 0.7341,
+          "std": 0.0927
+        },
+        "roc_auc": {
+          "mean": 0.8374,
+          "std": 0.0964
+        }
+      },
+      "per_fold": {
+        "accuracy": [
+          0.6889,
+          0.7778,
+          0.7111,
+          0.9111,
+          0.7778
+        ],
+        "precision": [
+          0.6667,
+          0.75,
+          0.6842,
+          0.9,
+          0.8667
+        ],
+        "recall": [
+          0.6,
+          0.75,
+          0.65,
+          0.9,
+          0.619
+        ],
+        "specificity": [
+          0.76,
+          0.8,
+          0.76,
+          0.92,
+          0.9167
+        ],
+        "f1": [
+          0.6316,
+          0.75,
+          0.6667,
+          0.9,
+          0.7222
+        ],
+        "roc_auc": [
+          0.75,
+          0.864,
+          0.714,
+          0.984,
+          0.875
+        ]
+      },
+      "confusion_matrices_per_fold": [
+        [
+          [
+            19,
+            6
+          ],
+          [
+            8,
+            12
+          ]
+        ],
+        [
+          [
+            20,
+            5
+          ],
+          [
+            5,
+            15
+          ]
+        ],
+        [
+          [
+            19,
+            6
+          ],
+          [
+            7,
+            13
+          ]
+        ],
+        [
+          [
+            23,
+            2
+          ],
+          [
+            2,
+            18
+          ]
+        ],
+        [
+          [
+            22,
+            2
+          ],
+          [
+            8,
+            13
+          ]
+        ]
+      ]
+    },
+    "noisy|speech|svm": {
+      "data": "noisy",
+      "modality": "speech",
+      "model": "svm",
+      "n_qubits": null,
+      "metrics": {
+        "accuracy": {
+          "mean": 0.9022,
+          "std": 0.0267
+        },
+        "precision": {
+          "mean": 0.8699,
+          "std": 0.0299
+        },
+        "recall": {
+          "mean": 0.9205,
+          "std": 0.0602
+        },
+        "specificity": {
+          "mean": 0.8873,
+          "std": 0.0292
+        },
+        "f1": {
+          "mean": 0.8932,
+          "std": 0.0321
+        },
+        "roc_auc": {
+          "mean": 0.9616,
+          "std": 0.0182
+        }
+      },
+      "per_fold": {
+        "accuracy": [
+          0.8889,
+          0.8667,
+          0.8889,
+          0.9333,
+          0.9333
+        ],
+        "precision": [
+          0.8947,
+          0.85,
+          0.8261,
+          0.8696,
+          0.9091
+        ],
+        "recall": [
+          0.85,
+          0.85,
+          0.95,
+          1.0,
+          0.9524
+        ],
+        "specificity": [
+          0.92,
+          0.88,
+          0.84,
+          0.88,
+          0.9167
+        ],
+        "f1": [
+          0.8718,
+          0.85,
+          0.8837,
+          0.9302,
+          0.9302
+        ],
+        "roc_auc": [
+          0.93,
+          0.974,
+          0.976,
+          0.952,
+          0.9762
+        ]
+      },
+      "confusion_matrices_per_fold": [
+        [
+          [
+            23,
+            2
+          ],
+          [
+            3,
+            17
+          ]
+        ],
+        [
+          [
+            22,
+            3
+          ],
+          [
+            3,
+            17
+          ]
+        ],
+        [
+          [
+            21,
+            4
+          ],
+          [
+            1,
+            19
+          ]
+        ],
+        [
+          [
+            22,
+            3
+          ],
+          [
+            0,
+            20
+          ]
+        ],
+        [
+          [
+            22,
+            2
+          ],
+          [
+            1,
+            20
+          ]
+        ]
+      ]
+    },
+    "noisy|speech|qsvm": {
+      "data": "noisy",
+      "modality": "speech",
+      "model": "qsvm",
+      "n_qubits": 2,
+      "metrics": {
+        "accuracy": {
+          "mean": 0.9022,
+          "std": 0.0412
+        },
+        "precision": {
+          "mean": 0.8608,
+          "std": 0.0644
+        },
+        "recall": {
+          "mean": 0.94,
+          "std": 0.0583
+        },
+        "specificity": {
+          "mean": 0.871,
+          "std": 0.0687
+        },
+        "f1": {
+          "mean": 0.8964,
+          "std": 0.0435
+        },
+        "roc_auc": {
+          "mean": 0.9604,
+          "std": 0.0281
+        }
+      },
+      "per_fold": {
+        "accuracy": [
+          0.8444,
+          0.9111,
+          0.9556,
+          0.8667,
+          0.9333
+        ],
+        "precision": [
+          0.8095,
+          0.9,
+          0.95,
+          0.7692,
+          0.875
+        ],
+        "recall": [
+          0.85,
+          0.9,
+          0.95,
+          1.0,
+          1.0
+        ],
+        "specificity": [
+          0.84,
+          0.92,
+          0.96,
+          0.76,
+          0.875
+        ],
+        "f1": [
+          0.8293,
+          0.9,
+          0.95,
+          0.8696,
+          0.9333
+        ],
+        "roc_auc": [
+          0.918,
+          0.984,
+          0.976,
+          0.936,
+          0.9881
+        ]
+      },
+      "confusion_matrices_per_fold": [
+        [
+          [
+            21,
+            4
+          ],
+          [
+            3,
+            17
+          ]
+        ],
+        [
+          [
+            23,
+            2
+          ],
+          [
+            2,
+            18
+          ]
+        ],
+        [
+          [
+            24,
+            1
+          ],
+          [
+            1,
+            19
+          ]
+        ],
+        [
+          [
+            19,
+            6
+          ],
+          [
+            0,
+            20
+          ]
+        ],
+        [
+          [
+            21,
+            3
+          ],
+          [
+            0,
+            21
+          ]
+        ]
+      ]
+    },
+    "noisy|fused|svm": {
+      "data": "noisy",
+      "modality": "fused",
+      "model": "svm",
+      "n_qubits": 6,
+      "metrics": {
+        "accuracy": {
+          "mean": 0.9422,
+          "std": 0.0301
+        },
+        "precision": {
+          "mean": 0.9356,
+          "std": 0.058
+        },
+        "recall": {
+          "mean": 0.94,
+          "std": 0.0374
+        },
+        "specificity": {
+          "mean": 0.9437,
+          "std": 0.0542
+        },
+        "f1": {
+          "mean": 0.9362,
+          "std": 0.0313
+        },
+        "roc_auc": {
+          "mean": 0.9884,
+          "std": 0.0093
+        }
+      },
+      "per_fold": {
+        "accuracy": [
+          0.9333,
+          0.9556,
+          0.8889,
+          0.9556,
+          0.9778
+        ],
+        "precision": [
+          0.9474,
+          1.0,
+          0.8261,
+          0.95,
+          0.9545
+        ],
+        "recall": [
+          0.9,
+          0.9,
+          0.95,
+          0.95,
+          1.0
+        ],
+        "specificity": [
+          0.96,
+          1.0,
+          0.84,
+          0.96,
+          0.9583
+        ],
+        "f1": [
+          0.9231,
+          0.9474,
+          0.8837,
+          0.95,
+          0.9767
+        ],
+        "roc_auc": [
+          0.982,
+          0.99,
+          0.974,
+          0.998,
+          0.998
+        ]
+      },
+      "confusion_matrices_per_fold": [
+        [
+          [
+            24,
+            1
+          ],
+          [
+            2,
+            18
+          ]
+        ],
+        [
+          [
+            25,
+            0
+          ],
+          [
+            2,
+            18
+          ]
+        ],
+        [
+          [
+            21,
+            4
+          ],
+          [
+            1,
+            19
+          ]
+        ],
+        [
+          [
+            24,
+            1
+          ],
+          [
+            1,
+            19
+          ]
+        ],
+        [
+          [
+            23,
+            1
+          ],
+          [
+            0,
+            21
+          ]
+        ]
+      ]
+    },
+    "noisy|fused|qsvm": {
+      "data": "noisy",
+      "modality": "fused",
+      "model": "qsvm",
+      "n_qubits": 6,
+      "metrics": {
+        "accuracy": {
+          "mean": 0.8667,
+          "std": 0.0562
+        },
+        "precision": {
+          "mean": 0.8696,
+          "std": 0.0948
+        },
+        "recall": {
+          "mean": 0.8519,
+          "std": 0.1176
+        },
+        "specificity": {
+          "mean": 0.8797,
+          "std": 0.1211
+        },
+        "f1": {
+          "mean": 0.8508,
+          "std": 0.0647
+        },
+        "roc_auc": {
+          "mean": 0.9469,
+          "std": 0.0389
+        }
+      },
+      "per_fold": {
+        "accuracy": [
+          0.8,
+          0.9333,
+          0.8,
+          0.9111,
+          0.8889
+        ],
+        "precision": [
+          0.8667,
+          0.9474,
+          0.6897,
+          0.9,
+          0.9444
+        ],
+        "recall": [
+          0.65,
+          0.9,
+          1.0,
+          0.9,
+          0.8095
+        ],
+        "specificity": [
+          0.92,
+          0.96,
+          0.64,
+          0.92,
+          0.9583
+        ],
+        "f1": [
+          0.7429,
+          0.9231,
+          0.8163,
+          0.9,
+          0.8718
+        ],
+        "roc_auc": [
+          0.884,
+          0.978,
+          0.92,
+          0.986,
+          0.9663
+        ]
+      },
+      "confusion_matrices_per_fold": [
+        [
+          [
+            23,
+            2
+          ],
+          [
+            7,
+            13
+          ]
+        ],
+        [
+          [
+            24,
+            1
+          ],
+          [
+            2,
+            18
+          ]
+        ],
+        [
+          [
+            16,
+            9
+          ],
+          [
+            0,
+            20
+          ]
+        ],
+        [
+          [
+            23,
+            2
+          ],
+          [
+            2,
+            18
+          ]
+        ],
+        [
+          [
+            23,
+            1
+          ],
+          [
+            4,
+            17
+          ]
+        ]
+      ]
+    },
+    "clean|fused|svm": {
+      "data": "clean",
+      "modality": "fused",
+      "model": "svm",
+      "n_qubits": 6,
+      "metrics": {
+        "accuracy": {
+          "mean": 1.0,
+          "std": 0.0
+        },
+        "precision": {
+          "mean": 1.0,
+          "std": 0.0
+        },
+        "recall": {
+          "mean": 1.0,
+          "std": 0.0
+        },
+        "specificity": {
+          "mean": 1.0,
+          "std": 0.0
+        },
+        "f1": {
+          "mean": 1.0,
+          "std": 0.0
+        },
+        "roc_auc": {
+          "mean": 1.0,
+          "std": 0.0
+        }
+      },
+      "per_fold": {
+        "accuracy": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "precision": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "recall": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "specificity": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "f1": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "roc_auc": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "confusion_matrices_per_fold": [
+        [
+          [
+            25,
+            0
+          ],
+          [
+            0,
+            20
+          ]
+        ],
+        [
+          [
+            25,
+            0
+          ],
+          [
+            0,
+            20
+          ]
+        ],
+        [
+          [
+            25,
+            0
+          ],
+          [
+            0,
+            20
+          ]
+        ],
+        [
+          [
+            25,
+            0
+          ],
+          [
+            0,
+            20
+          ]
+        ],
+        [
+          [
+            24,
+            0
+          ],
+          [
+            0,
+            21
+          ]
+        ]
+      ]
+    },
+    "clean|fused|qsvm": {
+      "data": "clean",
+      "modality": "fused",
+      "model": "qsvm",
+      "n_qubits": 6,
+      "metrics": {
+        "accuracy": {
+          "mean": 0.9911,
+          "std": 0.0178
+        },
+        "precision": {
+          "mean": 0.99,
+          "std": 0.02
+        },
+        "recall": {
+          "mean": 0.99,
+          "std": 0.02
+        },
+        "specificity": {
+          "mean": 0.992,
+          "std": 0.016
+        },
+        "f1": {
+          "mean": 0.99,
+          "std": 0.02
+        },
+        "roc_auc": {
+          "mean": 0.9996,
+          "std": 0.0008
+        }
+      },
+      "per_fold": {
+        "accuracy": [
+          1.0,
+          1.0,
+          1.0,
+          0.9556,
+          1.0
+        ],
+        "precision": [
+          1.0,
+          1.0,
+          1.0,
+          0.95,
+          1.0
+        ],
+        "recall": [
+          1.0,
+          1.0,
+          1.0,
+          0.95,
+          1.0
+        ],
+        "specificity": [
+          1.0,
+          1.0,
+          1.0,
+          0.96,
+          1.0
+        ],
+        "f1": [
+          1.0,
+          1.0,
+          1.0,
+          0.95,
+          1.0
+        ],
+        "roc_auc": [
+          1.0,
+          1.0,
+          1.0,
+          0.998,
+          1.0
+        ]
+      },
+      "confusion_matrices_per_fold": [
+        [
+          [
+            25,
+            0
+          ],
+          [
+            0,
+            20
+          ]
+        ],
+        [
+          [
+            25,
+            0
+          ],
+          [
+            0,
+            20
+          ]
+        ],
+        [
+          [
+            25,
+            0
+          ],
+          [
+            0,
+            20
+          ]
+        ],
+        [
+          [
+            24,
+            1
+          ],
+          [
+            1,
+            19
+          ]
+        ],
+        [
+          [
+            24,
+            0
+          ],
+          [
+            0,
+            21
+          ]
+        ]
+      ]
+    }
+  }
+}
