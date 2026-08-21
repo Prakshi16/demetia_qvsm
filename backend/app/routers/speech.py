@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 import os
+import subprocess
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
@@ -31,6 +32,50 @@ router = APIRouter(prefix="/visits", tags=["speech"])
 # record button (the whole point of that component) 400s before the audio is
 # ever looked at. Decoding them needs ffmpeg in the image; see backend/Dockerfile.
 ALLOWED_EXTENSIONS = {".wav", ".mp3", ".m4a", ".webm"}
+
+
+# librosa reads whatever libsndfile reads — wav and mp3, but not the opus and
+# aac that MediaRecorder produces. librosa 0.11 also dropped the old audioread
+# fallback, so it will not reach for ffmpeg on its own: it raises
+# "Format not recognised" and the upload 500s. Converting up front keeps that
+# decision here, in the upload layer, and leaves the extractor with the single
+# wav-shaped input it expects.
+TRANSCODE_EXTENSIONS = {".m4a", ".webm"}
+
+
+def _to_wav(audio_bytes: bytes) -> bytes:
+    """Decode a browser recording to 16-bit mono PCM wav via ffmpeg."""
+    try:
+        completed = subprocess.run(
+            [
+                "ffmpeg", "-loglevel", "error",
+                "-i", "pipe:0",
+                "-ac", "1",              # mono: the extractor averages anyway
+                "-c:a", "pcm_s16le",
+                "-f", "wav", "pipe:1",
+            ],
+            input=audio_bytes,
+            capture_output=True,
+            timeout=60,
+            check=True,
+        )
+    except FileNotFoundError as exc:  # ffmpeg missing from the image
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Audio conversion is unavailable on this server.",
+        ) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Audio file took too long to decode.",
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Audio file could not be decoded.",
+        ) from exc
+
+    return completed.stdout
 
 
 @router.post(
@@ -110,7 +155,13 @@ async def upload_speech(
     # ------------------------------------------------------------------
     # Extract speech features
     # ------------------------------------------------------------------
-    features = extract_speech_features(io.BytesIO(file_bytes))
+    audio_bytes = (
+        _to_wav(file_bytes)
+        if extension in TRANSCODE_EXTENSIONS
+        else file_bytes
+    )
+
+    features = extract_speech_features(io.BytesIO(audio_bytes))
 
     if len(features) != 18:
         raise HTTPException(
