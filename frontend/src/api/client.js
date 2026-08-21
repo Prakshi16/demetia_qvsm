@@ -132,6 +132,9 @@ export const api = {
   // --- patients (§5) ------------------------------------------------------
   getPatient: (patientId) => request(`/patients/${patientId}`),
 
+  // Creates the patient only — a visit is a separate, later step (§6 screen 3).
+  createPatient: (body) => request("/patients", { method: "POST", body }),
+
   // Returns { visit_type, reason } per the §4 decision logic. force_screening
   // is the manual override: screening is always allowed, follow-up isn't.
   getNextVisitType: (patientId, forceScreening = false) =>

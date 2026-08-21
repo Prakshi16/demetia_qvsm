@@ -433,3 +433,48 @@
   font-size: 0.85rem;
   color: var(--text-muted);
 }
+
+/* --- Register New Patient (§6 screen 3) --------------------------------- */
+
+.consent-intro {
+  margin-bottom: 16px;
+}
+
+.consent-choice {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.consent-choice legend {
+  margin-bottom: 8px;
+}
+
+.consent-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.consent-option:hover {
+  border-color: var(--accent);
+}
+
+.consent-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+
+.consent-relationship {
+  margin-top: 16px;
+  max-width: 26rem;
+}

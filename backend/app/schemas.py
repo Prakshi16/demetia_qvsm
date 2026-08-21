@@ -11,7 +11,7 @@ import uuid
 from datetime import date, datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 # Literals mirror the Postgres ENUM value sets in models.py / 001_init.sql.
 StaffRole = Literal["receptionist", "clinician"]
@@ -79,6 +79,21 @@ class PatientCreate(BaseModel):
     address: Optional[str] = None
     consent_given_by: ConsentGivenBy
     consent_relationship: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _require_relationship_for_guardian(self) -> "PatientCreate":
+        """Rule 7: a guardian consenting has to say who they are to the patient.
+
+        The register-patient form only shows the relationship field when
+        "Guardian / carer" is picked, but that is a UI convenience — a consent
+        record that says "a guardian consented" without naming the relationship
+        isn't a usable consent record, so the rule is enforced here too.
+        """
+        if self.consent_given_by == "guardian" and not (self.consent_relationship or "").strip():
+            raise ValueError(
+                "consent_relationship is required when consent is given by a guardian"
+            )
+        return self
 
 
 class PatientListItem(BaseModel):
