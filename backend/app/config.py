@@ -32,6 +32,16 @@ class Settings(BaseSettings):
     # this path won't exist and the loader falls back to <repo>/results.
     MODEL_DIR: str = "/model"
 
+    # Browser origins allowed to call this API, comma-separated. The Vite dev
+    # server is the default; a deployed frontend must add its own origin here
+    # (Render dashboard env var), because the app sends an Authorization header
+    # and a credentialed request cannot be answered with a wildcard origin.
+    CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
     # `.env` lives next to the backend package. In Docker the file is provided via
     # env_file so this path simply won't exist there — that's fine.
     model_config = SettingsConfigDict(

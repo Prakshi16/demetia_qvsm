@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db import get_db
 from app.routers import auth, dashboard, patients, visits, speech, mri_upload
 from app.services.prediction import USE_REAL_MODEL, warm_models
@@ -44,12 +45,14 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Cortex Health Portal API", version="0.1.0", lifespan=lifespan)
 
-# CORS: the Vite dev server runs on :5173; "*" is kept for the demo so teammates
-# can point their frontends at this backend without per-origin config. Tighten
-# before any non-demo deployment.
+# CORS: driven by CORS_ORIGINS (comma-separated), defaulting to the Vite dev
+# server. This used to include "*" for the demo, which cannot survive deploy:
+# every request carries an Authorization header, and a credentialed request
+# answered with a wildcard origin is rejected by the browser, not the server.
+# Add the deployed frontend origin as a Render env var rather than widening this.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

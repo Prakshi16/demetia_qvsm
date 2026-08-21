@@ -1,0 +1,49 @@
+# Render blueprint for the Cortex Health Portal API.
+#
+# Deploy: Render dashboard -> New -> Blueprint -> point at this repo. The five
+# secrets below are marked sync:false, so Render prompts for them instead of
+# reading them from here — nothing secret is ever committed.
+#
+# The frontend is NOT deployed from here; it goes to Vercel or Netlify from
+# ./frontend, with VITE_API_BASE_URL pointing at this service's /api/v1.
+
+services:
+  - type: web
+    name: cortex-health-portal-api
+    runtime: docker
+    plan: free
+    region: singapore          # nearest to the Supabase project and the demo
+    branch: main
+
+    # Repo root, not ./backend. The Dockerfile copies results/*.pkl into the
+    # image, and a build context cannot reach above itself — with a ./backend
+    # context the pickles are absent and /health reports model:"error".
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+
+    healthCheckPath: /api/v1/health
+
+    envVars:
+      # --- secrets: Render prompts on first deploy, nothing stored in git ---
+      - key: DATABASE_URL
+        sync: false
+        # MUST be the Supabase **Session pooler** URI, not the direct db.<ref>
+        # host. The direct host resolves to IPv6 only, and Render's egress is
+        # IPv4 — the direct URI fails with an unreachable-network error that
+        # looks like a credentials problem but is not.
+      - key: SUPABASE_URL
+        sync: false            # bare project origin, no /rest/v1 suffix
+      - key: SUPABASE_KEY
+        sync: false            # legacy JWT-format service_role key
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false            # the deployed frontend origin, e.g. https://<app>.vercel.app
+
+      # --- non-secret ---
+      - key: SUPABASE_BUCKET
+        value: patient-uploads
+      - key: MODEL_DIR
+        value: /model          # where the Dockerfile puts the pickles
+      - key: PYTHONUNBUFFERED
+        value: "1"

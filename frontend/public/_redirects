@@ -1,0 +1,7 @@
+# Netlify SPA fallback. React Router owns every path below the root, so a deep
+# link like /patients/new or /patients/<id>/new-visit/screening must be served
+# index.html rather than 404 — the dev server does this automatically, a static
+# host does not. Copied verbatim into dist/ by Vite.
+#
+# Vercel reads frontend/vercel.json instead; both are kept so either host works.
+/*    /index.html   200

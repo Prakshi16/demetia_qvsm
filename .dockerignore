@@ -1,0 +1,47 @@
+# The build context is the repo root (so ./results can be copied into the image),
+# which means everything else in the repo would otherwise be sent to the daemon.
+# Keep it to what the image actually needs: backend/ and the two pickles.
+
+# Datasets and notebooks — large, and nothing in the image reads them.
+data/
+notebooks/
+*.ipynb
+.ipynb_checkpoints/
+
+# Everything in results/ except the two pickles the Dockerfile copies.
+results/*
+!results/qsvm_model.pkl
+!results/svm_model.pkl
+
+# The frontend is deployed separately (Vercel/Netlify), not from this image.
+frontend/
+
+# Secrets must never enter the build context — Render injects env vars instead.
+.env
+.env.*
+!.env.example
+**/.env
+
+# Git, IDE, OS, Python and internal docs.
+.git/
+.gitignore
+.github/
+.claude/
+.vscode/
+.idea/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+env/
+.DS_Store
+Thumbs.db
+TO_build_*.md
+PROJECT_CONTEXT.md
+HANDOFF_*.md
+handoff_*.md
+
+# The backend Dockerfile itself does not belong inside the image.
+backend/Dockerfile

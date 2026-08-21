@@ -5,14 +5,20 @@
 services:
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      # Repo root, not ./backend: the Dockerfile copies the Phase 1 pickles from
+      # ./results, and a build context cannot reach above itself. This is what
+      # makes the local image identical to the one Render builds.
+      context: .
+      dockerfile: ./backend/Dockerfile
     ports:
       - "8000:8000"
     env_file:
       - ./backend/.env          # gitignored; each teammate copies backend/.env.example
     volumes:
       - ./backend:/app          # live code reload in dev
-      - ./results:/model:ro     # Phase 1 pickle, read-only (wired into serving later)
+      # The pickles are baked into the image now. This mount stays so that
+      # retraining locally takes effect without a rebuild, and it shadows the
+      # baked-in copy with the same files.
+      - ./results:/model:ro
     # --reload picks up code edits without rebuilding the image.
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
