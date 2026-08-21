@@ -10,9 +10,12 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # System deps: build-essential + libpq for psycopg2/scientific wheels that may
-# need compilation on slim.
+# need compilation on slim. ffmpeg is for librosa's audioread fallback — the
+# bundled libsndfile reads wav/mp3 but not the webm/opus and m4a that
+# MediaRecorder hands us from the browser's record button.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential libpq-dev \
+    && apt-get install -y --no-install-recommends \
+        build-essential libpq-dev ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python deps first so the layer caches across code changes.

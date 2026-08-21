@@ -1,10 +1,7 @@
 """
-Speech feature extraction.
+Real speech feature extraction using librosa.
 
-This placeholder implementation generates a deterministic 18-feature
-speech vector from an uploaded audio file.
-
-The output order MUST remain:
+Output order:
 
 [
     pause_rate,
@@ -17,15 +14,13 @@ The output order MUST remain:
     ...
     mfcc_13
 ]
-
-When real audio processing (librosa/parselmouth) is added later,
-only the body of extract_speech_features() should change.
 """
 
 from __future__ import annotations
 
-import hashlib
-import random
+import io
+import numpy as np
+import librosa
 
 
 FEATURE_ORDER = [
@@ -40,50 +35,147 @@ FEATURE_ORDER = [
 
 def extract_speech_features(file) -> list[float]:
     """
-    Generate an 18-element speech feature vector.
+    Extract 18 real speech features from an uploaded audio file.
 
     Args:
         file:
-            A file-like object or bytes containing the uploaded audio.
+            File-like object or bytes containing audio.
 
     Returns:
         list[float]:
             18 speech features in FEATURE_ORDER.
     """
 
+    # ---------------------------------------------------------
+    # 1. Read uploaded audio
+    # ---------------------------------------------------------
+
     file_bytes = file.read() if hasattr(file, "read") else bytes(file)
 
-    seed = int(hashlib.md5(file_bytes).hexdigest(), 16) % (2**32)
-    rng = random.Random(seed)
+    if not file_bytes:
+        raise ValueError("Audio file is empty.")
 
-    # Acoustic features
-    pause_rate = round(rng.uniform(0.05, 0.35), 4)
-    speech_rate = round(rng.uniform(2.5, 5.5), 4)
-    pitch_mean = round(rng.uniform(80.0, 250.0), 4)
-    jitter = round(rng.uniform(0.001, 0.03), 5)
-    shimmer = round(rng.uniform(0.01, 0.08), 5)
+    # librosa can load audio from a BytesIO object
+    audio_buffer = io.BytesIO(file_bytes)
 
-    # MFCC features
-    mfcc_ranges = [
-        (-60, 60),
-        (-40, 40),
-        (-30, 30),
-        (-25, 25),
-        (-20, 20),
-        (-18, 18),
-        (-15, 15),
-        (-12, 12),
-        (-10, 10),
-        (-8, 8),
-        (-7, 7),
-        (-6, 6),
-        (-5, 5),
-    ]
+    # Load audio
+    y, sr = librosa.load(
+        audio_buffer,
+        sr=16000,
+        mono=True,
+    )
 
-    mfccs = [
-        round(rng.uniform(low, high), 4)
-        for low, high in mfcc_ranges
-    ]
+    if len(y) == 0:
+        raise ValueError("Could not extract audio samples.")
+
+    # ---------------------------------------------------------
+    # 2. Pause rate
+    # ---------------------------------------------------------
+    #
+    # Detect silent portions using RMS energy.
+    #
+
+    rms = librosa.feature.rms(y=y)[0]
+
+    threshold = np.percentile(rms, 20)
+
+    silent_frames = rms < threshold
+
+    pause_rate = float(np.mean(silent_frames))
+
+    # ---------------------------------------------------------
+    # 3. Speech rate
+    # ---------------------------------------------------------
+    #
+    # Approximate speech rate using onset events.
+    #
+
+    onset_frames = librosa.onset.onset_detect(
+        y=y,
+        sr=sr
+    )
+
+    duration = librosa.get_duration(y=y, sr=sr)
+
+    if duration > 0:
+        speech_rate = len(onset_frames) / duration
+    else:
+        speech_rate = 0.0
+
+    # ---------------------------------------------------------
+    # 4. Pitch mean
+    # ---------------------------------------------------------
+
+    f0, voiced_flag, voiced_prob = librosa.pyin(
+        y,
+        fmin=librosa.note_to_hz("C2"),
+        fmax=librosa.note_to_hz("C7"),
+        sr=sr,
+    )
+
+    valid_pitch = f0[np.isfinite(f0)]
+
+    if len(valid_pitch) > 0:
+        pitch_mean = float(np.mean(valid_pitch))
+    else:
+        pitch_mean = 0.0
+
+    # ---------------------------------------------------------
+    # 5. Jitter
+    # ---------------------------------------------------------
+    #
+    # Jitter = variation between consecutive pitch periods.
+    #
+
+    if len(valid_pitch) > 1:
+
+        periods = 1.0 / valid_pitch
+
+        jitter = float(
+            np.mean(
+                np.abs(np.diff(periods))
+            )
+            / np.mean(periods)
+        )
+
+    else:
+        jitter = 0.0
+
+    # ---------------------------------------------------------
+    # 6. Shimmer
+    # ---------------------------------------------------------
+    #
+    # Approximate amplitude variation between frames.
+    #
+
+    frame_rms = librosa.feature.rms(y=y)[0]
+
+    if len(frame_rms) > 1 and np.mean(frame_rms) > 0:
+
+        shimmer = float(
+            np.mean(np.abs(np.diff(frame_rms)))
+            / np.mean(frame_rms)
+        )
+
+    else:
+        shimmer = 0.0
+
+    # ---------------------------------------------------------
+    # 7. MFCCs
+    # ---------------------------------------------------------
+
+    mfcc = librosa.feature.mfcc(
+        y=y,
+        sr=sr,
+        n_mfcc=13,
+    )
+
+    # Take mean of each MFCC coefficient across time
+    mfcc_means = np.mean(mfcc, axis=1)
+
+    # ---------------------------------------------------------
+    # 8. Build final 18-feature vector
+    # ---------------------------------------------------------
 
     features = [
         pause_rate,
@@ -91,9 +183,24 @@ def extract_speech_features(file) -> list[float]:
         pitch_mean,
         jitter,
         shimmer,
-        *mfccs,
+        *mfcc_means.tolist(),
     ]
 
-    assert len(features) == 18, f"Expected 18 features, got {len(features)}"
+    # ---------------------------------------------------------
+    # 9. Safety checks
+    # ---------------------------------------------------------
 
-    return [float(value) for value in features]
+    if len(features) != 18:
+        raise ValueError(
+            f"Expected 18 speech features, got {len(features)}"
+        )
+
+    # Replace NaN / infinity if audio produces them
+    features = np.nan_to_num(
+        features,
+        nan=0.0,
+        posinf=0.0,
+        neginf=0.0,
+    )
+
+    return [float(round(value, 4)) for value in features]

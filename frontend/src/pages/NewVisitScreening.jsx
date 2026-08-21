@@ -22,9 +22,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 
 import { api } from "../api/client";
 import MriUpload from "../components/MriUpload";
-// Sheetal's <SpeechCapture /> (record + waveform + timer) replaces this import
-// when it lands — same props, same endpoint, so it's a one-line swap.
-import SpeechUpload from "../components/SpeechUpload";
+import SpeechCapture from "../components/SpeechCapture";
 
 // CDR is a fixed clinical scale, and the model was trained on {0, 0.5, 1, 2}
 // only — a free number field would let a 3 through to a pipeline that has never
@@ -332,7 +330,7 @@ export default function NewVisitScreening() {
               {speechDone ? (
                 <p className="visit-done">Features extracted ✓</p>
               ) : (
-                <SpeechUpload visitId={visit.id} onDone={handleUploadDone} />
+                <SpeechCapture visitId={visit.id} onDone={handleUploadDone} />
               )}
             </div>
           </div>

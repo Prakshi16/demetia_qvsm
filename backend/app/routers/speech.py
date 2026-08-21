@@ -26,7 +26,11 @@ from app.services.speech_features import extract_speech_features
 
 router = APIRouter(prefix="/visits", tags=["speech"])
 
-ALLOWED_EXTENSIONS = {".wav", ".mp3"}
+# .webm and .m4a are here because <SpeechCapture /> records through
+# MediaRecorder, which only ever produces one of those two — without them the
+# record button (the whole point of that component) 400s before the audio is
+# ever looked at. Decoding them needs ffmpeg in the image; see backend/Dockerfile.
+ALLOWED_EXTENSIONS = {".wav", ".mp3", ".m4a", ".webm"}
 
 
 @router.post(
@@ -74,7 +78,8 @@ async def upload_speech(
     if extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only .wav and .mp3 files are allowed",
+            detail=f"Unsupported audio file type. Accepted formats: "
+                   f"{', '.join(sorted(ALLOWED_EXTENSIONS))}.",
         )
 
     # ------------------------------------------------------------------
