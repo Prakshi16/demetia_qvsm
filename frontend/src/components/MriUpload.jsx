@@ -1,5 +1,11 @@
 import { useState } from "react";
 
+// File uploads are the one deliberate exception to "everything goes through
+// src/api/client.js": a JSON wrapper cannot carry multipart FormData. So this
+// component keeps its raw fetch and borrows the client's two constants instead
+// of hardcoding the base URL or the token key.
+import { API_BASE_URL, TOKEN_KEY } from "../api/client";
+
 const STATUS = {
   IDLE: "idle",
   UPLOADING: "uploading",
@@ -8,7 +14,9 @@ const STATUS = {
 };
 
 const ACCEPTED_EXTENSIONS = [".nii", ".nii.gz", ".dcm", ".dicom", ".mgh", ".mgz"];
-const MAX_FILE_SIZE_BYTES = 250 * 1024 * 1024;
+// 50 MB — the Supabase free-tier per-file storage limit, matching the
+// backend's own cap so an oversized file fails here rather than mid-upload.
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 
 function hasAcceptedExtension(fileName) {
   const normalizedFileName = fileName.toLowerCase();
@@ -79,8 +87,13 @@ export default function MriUpload({ visitId, onDone }) {
     setStatus(STATUS.UPLOADING);
 
     try {
-      const response = await fetch(`/api/v1/visits/${visitId}/mri-upload`, {
+      // Do NOT set Content-Type — the browser has to set the multipart
+      // boundary itself, and overriding it breaks the upload.
+      const response = await fetch(`${API_BASE_URL}/visits/${visitId}/mri-upload`, {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY)}`,
+        },
         body: formData,
       });
 
