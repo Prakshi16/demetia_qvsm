@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { TOKEN_KEY } from "../api/client";
 
 const STATUS = {
   IDLE: "idle",
@@ -8,7 +9,7 @@ const STATUS = {
 };
 
 const ACCEPTED_EXTENSIONS = [".nii", ".nii.gz", ".dcm", ".dicom", ".mgh", ".mgz"];
-const MAX_FILE_SIZE_BYTES = 250 * 1024 * 1024;
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 
 function hasAcceptedExtension(fileName) {
   const normalizedFileName = fileName.toLowerCase();
@@ -81,6 +82,9 @@ export default function MriUpload({ visitId, onDone }) {
     try {
       const response = await fetch(`/api/v1/visits/${visitId}/mri-upload`, {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY)}`,
+        },
         body: formData,
       });
 
