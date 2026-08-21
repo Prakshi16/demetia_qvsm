@@ -84,7 +84,8 @@ code,
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
   width: 100%;
   padding: 10px 12px;
   font: inherit;
@@ -94,15 +95,22 @@ code,
   border-radius: 8px;
 }
 
+.field textarea {
+  resize: vertical;
+  min-height: 88px;
+}
+
 .field input:focus,
 .field select:focus,
+.field textarea:focus,
 button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
 .field input:disabled,
-.field select:disabled {
+.field select:disabled,
+.field textarea:disabled {
   background: #f3f5f8;
   color: var(--text-muted);
 }

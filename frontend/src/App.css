@@ -1,5 +1,5 @@
 /**
- * Layout: the auth screens, the signed-in shell, and the placeholder dashboard.
+ * Layout: the auth screens and the signed-in shell.
  * Shared primitives (fields, buttons, errors) live in index.css.
  */
 
@@ -212,29 +212,6 @@
 .page {
   max-width: 900px;
   margin: 0 auto;
-}
-
-/* --- placeholder dashboard (delete with the component) ------------------ */
-
-.placeholder-card {
-  padding: 28px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-card);
-}
-
-.placeholder-tag {
-  display: inline-block;
-  margin: 0 0 12px;
-  padding: 3px 10px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #8a5a00;
-  background: #fdf1d8;
-  border-radius: 999px;
 }
 
 .detail-grid {
@@ -484,4 +461,341 @@
 .consent-relationship {
   margin-top: 16px;
   max-width: 26rem;
+}
+
+/* --- Dashboard (§6 screen 2) --- */
+
+.patient-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.patient-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+  background: var(--surface);
+}
+
+.patient-row:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.patient-row-main,
+.patient-row-visit {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.patient-row-name {
+  font-weight: 600;
+}
+
+.patient-row-date {
+  font-size: 0.9rem;
+}
+
+.patient-row-meta {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.patient-row-tail {
+  justify-self: end;
+}
+
+.patient-chip {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.patient-chip--pending_review,
+.patient-chip--missing {
+  color: #8a5a00;
+  background: #fdf3e2;
+  border-color: #f0dcb8;
+}
+
+.patient-chip--reviewed,
+.patient-chip--completed {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: #c4ddf3;
+}
+
+.list-note {
+  margin: 0;
+  padding: 16px 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* --- Patient Profile (§6 screen 4) --- */
+
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.detail-grid-wide {
+  grid-column: 1 / -1;
+}
+
+.visit-history {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+/* §6 calls each entry a "visit date rectangle" — the date leads, and the whole
+   block is the click target rather than a link buried inside a table row. */
+.visit-rect {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+  background: var(--surface);
+}
+
+.visit-rect:hover {
+  border-color: var(--accent);
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.visit-rect-date {
+  font-weight: 600;
+}
+
+.visit-rect-type,
+.visit-rect-outcome {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.visit-rect-outcome {
+  justify-self: end;
+  text-align: right;
+}
+
+.visit-rect-status {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.visit-rect-status--pending_review {
+  color: #8a5a00;
+  background: #fdf3e2;
+  border-color: #f0dcb8;
+}
+
+.visit-rect-status--awaiting_uploads {
+  color: var(--text-muted);
+  background: var(--bg);
+  border-style: dashed;
+}
+
+.visit-rect-status--reviewed,
+.visit-rect-status--completed {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: #c4ddf3;
+}
+
+/* --- Trend chart --- */
+
+.trend {
+  display: grid;
+  gap: 10px;
+}
+
+.trend-legend {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.trend-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.trend-legend-hint {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.trend-swatch {
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.trend-swatch--mmse {
+  background: var(--accent);
+}
+
+.trend-swatch--cdr {
+  background: #b3591e;
+}
+
+/* The SVG has a fixed viewBox, so on a narrow screen it scrolls inside the card
+   rather than squashing the axis labels into each other. */
+.trend-scroll {
+  overflow-x: auto;
+}
+
+.trend-svg {
+  display: block;
+  width: 100%;
+  min-width: 420px;
+  height: auto;
+}
+
+.trend-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.trend-axis {
+  fill: var(--text-muted);
+  font-size: 11px;
+}
+
+.trend-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.trend-line--mmse {
+  stroke: var(--accent);
+}
+
+.trend-line--cdr {
+  stroke: #b3591e;
+}
+
+.trend-dot--mmse {
+  fill: var(--accent);
+}
+
+.trend-dot--cdr {
+  fill: #b3591e;
+}
+
+/* --- Visit Detail (§6 screen 7) --- */
+
+.visit-chip--match {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: #c4ddf3;
+}
+
+.visit-chip--mismatch {
+  color: #8a5a00;
+  background: #fdf3e2;
+  border-color: #f0dcb8;
+}
+
+.diagnosis-history {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.history-list {
+  margin: 12px 0 0;
+  padding: 0 0 0 18px;
+  display: grid;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+
+.history-list li {
+  display: grid;
+  gap: 2px;
+}
+
+.history-when {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.history-what {
+  font-weight: 600;
+}
+
+.history-notes {
+  color: var(--text-muted);
+}
+
+/* Export-as-PDF is the browser's own print-to-PDF (§6). Drop the chrome and the
+   controls so the sheet carries the record and nothing that only works on a
+   screen. */
+@media print {
+  .app-nav,
+  .back-link,
+  .no-print {
+    display: none !important;
+  }
+
+  .visit-detail .visit-card {
+    box-shadow: none;
+    break-inside: avoid;
+  }
+
+  .app-main {
+    padding: 0;
+  }
+}
+
+/* The revise-diagnosis form sits directly under the saved values on a
+   reviewed visit, and needs a gap so the two don't read as one block. */
+.detail-grid + .visit-form {
+  margin-top: 20px;
 }

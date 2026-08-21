@@ -5,37 +5,24 @@
  * <ProtectedRoute>, rendered inside <AppLayout /> so every signed-in screen gets
  * the same nav bar.
  *
- * ---------------------------------------------------------------------------
- * GOVIND — this is where your three screens plug in (§6 screens 2, 4, 7).
- * Drop your components into src/pages/ and add them to the protected group
- * below; the commented routes are the paths the rest of the app already links to,
- * so please keep these exact paths:
- *
- *     <Route path="/patients/:patientId" element={<PatientProfile />} />
- *     <Route path="/visits/:visitId"     element={<VisitDetail />} />
- *
- * and swap <DashboardPlaceholder /> for your <Dashboard />.
- *
- * Notes so nothing surprises you:
- *   - You do NOT need to fetch or pass the token. Use `api` from src/api/client.js
- *     and it attaches the JWT itself; an expired token signs the user out.
- *   - `useAuth()` from src/auth/AuthContext gives you `user` ({ id, hospital_id,
- *     name, email, role }) for the role-aware bits of the dashboard.
- *   - Screens that only one role should reach take a roles prop, e.g.
- *     <ProtectedRoute roles={["clinician"]}>. That's UI convenience only —
- *     the real rule is enforced server-side.
- * ---------------------------------------------------------------------------
+ * All seven of §6's screens are routed here now. Note that no route carries a
+ * `roles` prop: both roles may open a patient, a visit and the dashboard, and
+ * the parts only one role should act on (the diagnosis form, the two queues)
+ * are gated inside the screens. Role enforcement that matters lives on the
+ * server — a `roles` prop hides a link, it does not protect an endpoint.
  */
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./auth/ProtectedRoute";
-import DashboardPlaceholder from "./pages/DashboardPlaceholder";
+import Dashboard from "./pages/Dashboard";
 import NewVisitFollowUp from "./pages/NewVisitFollowUp";
 import NewVisitScreening from "./pages/NewVisitScreening";
+import PatientProfile from "./pages/PatientProfile";
 import RegisterPatient from "./pages/RegisterPatient";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
+import VisitDetail from "./pages/VisitDetail";
 import "./App.css";
 
 export default function App() {
@@ -53,7 +40,7 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={<DashboardPlaceholder />} />
+        <Route path="/" element={<Dashboard />} />
 
         {/* §6 screen 3. A static segment, so React Router ranks it above
             Govind's /patients/:patientId and it won't be swallowed by it. */}
@@ -72,7 +59,10 @@ export default function App() {
           element={<NewVisitFollowUp />}
         />
 
-        {/* GOVIND: add /patients/:patientId and /visits/:visitId here. */}
+        {/* §6 screens 4 and 7. These two paths are what every other screen's
+            back link and every list row already point at, so they are fixed. */}
+        <Route path="/patients/:patientId" element={<PatientProfile />} />
+        <Route path="/visits/:visitId" element={<VisitDetail />} />
       </Route>
 
       {/* Unknown path -> home, which itself redirects to /signin if signed out. */}

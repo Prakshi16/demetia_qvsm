@@ -110,6 +110,12 @@ async function request(path, { method = "GET", body, auth = true } = {}) {
   return payload;
 }
 
+/** "" -> "", "ada" -> "?search=ada". Keeps the query out of the call sites. */
+function searchQuery(search) {
+  const trimmed = (search ?? "").trim();
+  return trimmed === "" ? "" : `?search=${encodeURIComponent(trimmed)}`;
+}
+
 export const api = {
   // --- auth (§5) ---------------------------------------------------------
   // All three auth calls return { token, user } so the caller is logged in
@@ -127,7 +133,20 @@ export const api = {
   // --- everything else ---------------------------------------------------
   // Add the patient/visit/dashboard calls here as the screens that need them
   // get built, so no component ever calls fetch() directly.
-  getDashboard: () => request("/dashboard"),
+  // Role-aware (§5): the same deduped, most-recent-visit-first patient list for
+  // both roles. The specialised queues below are separate endpoints, not filters
+  // of this one, and never overlap with each other.
+  getDashboard: (search = "") => request(`/dashboard${searchQuery(search)}`),
+
+  // Clinician only. Patients whose latest visit is a screening sitting in
+  // pending_review — complete data, no diagnosis yet (Product Rule 3).
+  getPendingReview: (search = "") =>
+    request(`/patients/pending-review${searchQuery(search)}`),
+
+  // Receptionist only. Patients whose latest visit is still awaiting_uploads,
+  // i.e. resumable half-finished screenings (Product Rule 2A).
+  getIncompleteVisits: (search = "") =>
+    request(`/patients/incomplete-visits${searchQuery(search)}`),
 
   // --- patients (§5) ------------------------------------------------------
   getPatient: (patientId) => request(`/patients/${patientId}`),
@@ -147,6 +166,12 @@ export const api = {
   createVisit: (body) => request("/visits", { method: "POST", body }),
 
   getVisit: (visitId) => request(`/visits/${visitId}`),
+
+  // Clinician only. Valid on a screening in pending_review, or on one reviewed
+  // earlier the same UTC day (Rule 5) — the server rejects anything else, so a
+  // 400 here is the rule working, not a bug to route around.
+  saveDiagnosis: (visitId, body) =>
+    request(`/visits/${visitId}/diagnosis`, { method: "POST", body }),
 };
 
 export { request };
