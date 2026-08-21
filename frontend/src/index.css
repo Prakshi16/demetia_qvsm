@@ -143,6 +143,17 @@ button:focus-visible {
   border-color: var(--text-muted);
 }
 
+/* Both button classes are also used on React Router's <Link>, which renders an
+   <a>. An anchor is display:inline, so its padding does not grow the line box —
+   the padded background bleeds over whatever sits above it, and the underline
+   stays. Neither is true of a <button>, so the styles above look correct until
+   the first time one is used as a link. */
+a.button-primary,
+a.button-quiet {
+  display: inline-block;
+  text-decoration: none;
+}
+
 .form-error {
   margin: 0;
   padding: 10px 12px;

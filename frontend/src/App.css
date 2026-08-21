@@ -324,6 +324,13 @@
   opacity: 0.6;
 }
 
+/* The only button-styled link inside a card is the follow-up screen's
+   "start a screening instead". Now that it is inline-block it sits flush
+   against the reason above it. */
+.visit-card a.button-primary {
+  margin-top: 16px;
+}
+
 .visit-card-head {
   display: flex;
   align-items: center;
