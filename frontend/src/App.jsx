@@ -31,6 +31,9 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import DashboardPlaceholder from "./pages/DashboardPlaceholder";
+import NewVisitFollowUp from "./pages/NewVisitFollowUp";
+import NewVisitScreening from "./pages/NewVisitScreening";
+import RegisterPatient from "./pages/RegisterPatient";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import "./App.css";
@@ -51,6 +54,24 @@ export default function App() {
         }
       >
         <Route path="/" element={<DashboardPlaceholder />} />
+
+        {/* §6 screen 3. A static segment, so React Router ranks it above
+            Govind's /patients/:patientId and it won't be swallowed by it. */}
+        <Route path="/patients/new" element={<RegisterPatient />} />
+
+        {/* §6 screens 5 and 6. Deliberately NOT /patients/:patientId or
+            /visits/:visitId — those two paths are reserved for Govind's
+            screens, which these screens' back links already point at.
+            ?visitId=... resumes an awaiting_uploads visit (Product Rule 2A). */}
+        <Route
+          path="/patients/:patientId/new-visit/screening"
+          element={<NewVisitScreening />}
+        />
+        <Route
+          path="/patients/:patientId/new-visit/follow-up"
+          element={<NewVisitFollowUp />}
+        />
+
         {/* GOVIND: add /patients/:patientId and /visits/:visitId here. */}
       </Route>
 

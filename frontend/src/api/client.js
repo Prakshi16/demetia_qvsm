@@ -128,6 +128,25 @@ export const api = {
   // Add the patient/visit/dashboard calls here as the screens that need them
   // get built, so no component ever calls fetch() directly.
   getDashboard: () => request("/dashboard"),
+
+  // --- patients (§5) ------------------------------------------------------
+  getPatient: (patientId) => request(`/patients/${patientId}`),
+
+  // Creates the patient only — a visit is a separate, later step (§6 screen 3).
+  createPatient: (body) => request("/patients", { method: "POST", body }),
+
+  // Returns { visit_type, reason } per the §4 decision logic. force_screening
+  // is the manual override: screening is always allowed, follow-up isn't.
+  getNextVisitType: (patientId, forceScreening = false) =>
+    request(`/patients/${patientId}/next-visit-type?force_screening=${forceScreening}`),
+
+  // --- visits (§5) --------------------------------------------------------
+  // A screening visit comes back as awaiting_uploads with both modalities idle;
+  // the MRI/speech files are posted separately to the upload endpoints, which
+  // are the one place that can't use this client (multipart FormData).
+  createVisit: (body) => request("/visits", { method: "POST", body }),
+
+  getVisit: (visitId) => request(`/visits/${visitId}`),
 };
 
 export { request };

@@ -258,3 +258,223 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* --- New Visit: Screening (§6 screen 5) --------------------------------- */
+
+.visit-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.visit-loading {
+  color: var(--text-muted);
+}
+
+.back-link {
+  align-self: flex-start;
+  font-size: 0.9rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.visit-header h1 {
+  margin: 4px 0 8px;
+  font-size: 1.6rem;
+}
+
+.visit-eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.visit-subtitle {
+  margin: 0;
+  max-width: 46rem;
+  color: var(--text-muted);
+}
+
+.visit-disclaimer {
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--border-strong);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  font-size: 0.9rem;
+}
+
+.visit-card {
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+
+.visit-card--locked {
+  opacity: 0.6;
+}
+
+.visit-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.visit-card-head h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.visit-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.visit-chip--done {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.visit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.visit-form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 16px;
+}
+
+.visit-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.visit-uploads {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 20px;
+}
+
+.visit-upload-slot h3 {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+}
+
+.visit-done {
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.visit-card--result {
+  border-color: var(--accent);
+}
+
+.visit-predictions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.visit-prediction {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.visit-prediction-label {
+  margin: 0 0 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.visit-prediction-value {
+  margin: 0 0 4px;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+/* A margin (distance from the decision boundary), never a percentage —
+   monospace so it reads as a raw number rather than a score. */
+.visit-prediction-margin {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* --- Register New Patient (§6 screen 3) --------------------------------- */
+
+.consent-intro {
+  margin-bottom: 16px;
+}
+
+.consent-choice {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.consent-choice legend {
+  margin-bottom: 8px;
+}
+
+.consent-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.consent-option:hover {
+  border-color: var(--accent);
+}
+
+.consent-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+
+.consent-relationship {
+  margin-top: 16px;
+  max-width: 26rem;
+}

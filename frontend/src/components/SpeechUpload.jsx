@@ -1,9 +1,25 @@
+/**
+ * Speech upload card for the New Visit — Screening page (§6 screen 5).
+ *
+ * TEMPORARY, and deliberately minimal: Sheetal owns <SpeechCapture />, the
+ * richer component with a record button, live waveform and timer (MediaRecorder
+ * API), with file upload only as its fallback. That component does not exist
+ * yet and screen 5 cannot be tested without *some* speech card, so this is the
+ * fallback half on its own.
+ *
+ * It takes the same props and calls the same endpoint, so when <SpeechCapture />
+ * lands it replaces this as a one-line import swap in NewVisitScreening.jsx —
+ * not a merge conflict. Delete this file at that point.
+ *
+ * Structure mirrors MriUpload.jsx on purpose: both upload cards should look and
+ * behave the same, the same way both upload endpoints mirror each other.
+ */
 import { useState } from "react";
 
 // File uploads are the one deliberate exception to "everything goes through
 // src/api/client.js": a JSON wrapper cannot carry multipart FormData. So this
-// component keeps its raw fetch and borrows the client's two constants instead
-// of hardcoding the base URL or the token key.
+// component uses a raw fetch and borrows the client's two constants instead of
+// hardcoding the base URL or the token key.
 import { API_BASE_URL, TOKEN_KEY } from "../api/client";
 
 const STATUS = {
@@ -13,9 +29,11 @@ const STATUS = {
   DONE: "done",
 };
 
-const ACCEPTED_EXTENSIONS = [".nii", ".nii.gz", ".dcm", ".dicom", ".mgh", ".mgz"];
-// 50 MB — the Supabase free-tier per-file storage limit, matching the
-// backend's own cap so an oversized file fails here rather than mid-upload.
+// The backend allowlist is .wav/.mp3 only (Product Rule 11) — anything else is
+// rejected server-side before extraction runs, so reject it here first.
+const ACCEPTED_EXTENSIONS = [".wav", ".mp3"];
+
+// 50 MB — the Supabase free-tier per-file storage limit, matching the backend.
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 
 function hasAcceptedExtension(fileName) {
@@ -29,7 +47,7 @@ function formatMegabytes(bytes) {
 
 function validateFile(file) {
   if (!file) {
-    return "Select an MRI scan file.";
+    return "Select an audio recording.";
   }
 
   if (!hasAcceptedExtension(file.name)) {
@@ -37,7 +55,7 @@ function validateFile(file) {
   }
 
   if (file.size <= 0) {
-    return "The selected MRI file is empty.";
+    return "The selected audio file is empty.";
   }
 
   if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -47,35 +65,27 @@ function validateFile(file) {
   return "";
 }
 
-export default function MriUpload({ visitId, onDone }) {
+export default function SpeechUpload({ visitId, onDone }) {
   const [status, setStatus] = useState(STATUS.IDLE);
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
 
-  const inputId = `mri-upload-${String(visitId || "new").replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const inputId = `speech-upload-${String(visitId || "new").replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const isBusy = status === STATUS.UPLOADING || status === STATUS.PROCESSING;
 
   const statusText = {
-    [STATUS.IDLE]: "No file uploaded",
-    [STATUS.UPLOADING]: "Uploading MRI scan...",
-    [STATUS.PROCESSING]: "Extracting imaging features",
+    [STATUS.IDLE]: "No recording uploaded",
+    [STATUS.UPLOADING]: "Uploading recording...",
+    [STATUS.PROCESSING]: "Extracting speech features",
     [STATUS.DONE]: "Features extracted",
   }[status];
 
-  async function uploadMriFile(file) {
+  async function uploadSpeechFile(file) {
     const validationMessage = validateFile(file);
 
     if (validationMessage) {
       setError(validationMessage);
-      setStatus(STATUS.IDLE);
-      setFileName("");
-      return;
-    }
-
-    if (!visitId) {
-      setError("A visit ID is required before uploading MRI data.");
-      setStatus(STATUS.IDLE);
       return;
     }
 
@@ -89,7 +99,7 @@ export default function MriUpload({ visitId, onDone }) {
     try {
       // Do NOT set Content-Type — the browser has to set the multipart
       // boundary itself, and overriding it breaks the upload.
-      const response = await fetch(`${API_BASE_URL}/visits/${visitId}/mri-upload`, {
+      const response = await fetch(`${API_BASE_URL}/visits/${visitId}/speech-upload`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY)}`,
@@ -102,19 +112,23 @@ export default function MriUpload({ visitId, onDone }) {
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(payload.detail || "MRI upload failed.");
+        throw new Error(
+          typeof payload.detail === "string" ? payload.detail : "Speech upload failed.",
+        );
       }
 
       setStatus(STATUS.DONE);
+      // The endpoint returns the whole visit (VisitDetailOut), so the parent can
+      // read mri_status/speech_status/model_prediction straight off this.
       onDone?.(payload);
     } catch (uploadError) {
-      setError(uploadError.message || "MRI upload failed. Please try again.");
+      setError(uploadError.message || "Speech upload failed. Please try again.");
       setStatus(STATUS.IDLE);
     }
   }
 
   function handleInputChange(event) {
-    uploadMriFile(event.target.files?.[0]);
+    uploadSpeechFile(event.target.files?.[0]);
     event.target.value = "";
   }
 
@@ -123,17 +137,17 @@ export default function MriUpload({ visitId, onDone }) {
     setIsDragging(false);
 
     if (!isBusy) {
-      uploadMriFile(event.dataTransfer.files?.[0]);
+      uploadSpeechFile(event.dataTransfer.files?.[0]);
     }
   }
 
   return (
-    <section className="mri-upload" aria-busy={isBusy}>
+    <section className="speech-upload" aria-busy={isBusy}>
       <style>{styles}</style>
 
       <input
         id={inputId}
-        className="mri-upload__input"
+        className="speech-upload__input"
         type="file"
         accept={ACCEPTED_EXTENSIONS.join(",")}
         onChange={handleInputChange}
@@ -141,7 +155,7 @@ export default function MriUpload({ visitId, onDone }) {
       />
 
       <label
-        className={`mri-upload__dropzone${isDragging ? " mri-upload__dropzone--dragging" : ""}`}
+        className={`speech-upload__dropzone${isDragging ? " speech-upload__dropzone--dragging" : ""}`}
         htmlFor={isBusy ? undefined : inputId}
         onDragEnter={(event) => {
           event.preventDefault();
@@ -152,20 +166,22 @@ export default function MriUpload({ visitId, onDone }) {
         onDrop={handleDrop}
         aria-disabled={isBusy}
       >
-        <span className="mri-upload__icon" aria-hidden="true">
-          +
+        <span className="speech-upload__icon" aria-hidden="true">
+          ♪
         </span>
-        <span className="mri-upload__status">
+        <span className="speech-upload__status">
           {statusText}
           {status === STATUS.DONE ? " ✓" : ""}
         </span>
-        <span className="mri-upload__hint">Drag and drop an MRI scan here, or click to upload.</span>
+        <span className="speech-upload__hint">
+          Drag and drop a .wav or .mp3 recording here, or click to upload.
+        </span>
       </label>
 
-      {fileName && <p className="mri-upload__file">{fileName}</p>}
+      {fileName && <p className="speech-upload__file">{fileName}</p>}
 
       {error && (
-        <p className="mri-upload__error" role="alert">
+        <p className="speech-upload__error" role="alert">
           {error}
         </p>
       )}
@@ -174,17 +190,16 @@ export default function MriUpload({ visitId, onDone }) {
 }
 
 const styles = `
-.mri-upload {
+.speech-upload {
   width: 100%;
-  max-width: 34rem;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: inherit;
 }
 
-.mri-upload__input {
+.speech-upload__input {
   display: none;
 }
 
-.mri-upload__dropzone {
+.speech-upload__dropzone {
   min-height: 12rem;
   display: flex;
   flex-direction: column;
@@ -200,18 +215,18 @@ const styles = `
   text-align: center;
 }
 
-.mri-upload__dropzone:hover,
-.mri-upload__dropzone--dragging {
+.speech-upload__dropzone:hover,
+.speech-upload__dropzone--dragging {
   border-color: #2563eb;
   background: #eff6ff;
 }
 
-.mri-upload__dropzone[aria-disabled="true"] {
+.speech-upload__dropzone[aria-disabled="true"] {
   cursor: wait;
   opacity: 0.75;
 }
 
-.mri-upload__icon {
+.speech-upload__icon {
   width: 2.25rem;
   height: 2.25rem;
   display: inline-flex;
@@ -220,34 +235,30 @@ const styles = `
   border-radius: 50%;
   background: #dbeafe;
   color: #1d4ed8;
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   line-height: 1;
 }
 
-.mri-upload__status {
+.speech-upload__status {
   font-size: 1rem;
   font-weight: 700;
 }
 
-.mri-upload__hint,
-.mri-upload__file,
-.mri-upload__error {
-  margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.45;
-}
-
-.mri-upload__hint,
-.mri-upload__file {
+.speech-upload__hint {
+  font-size: 0.875rem;
   color: #475569;
 }
 
-.mri-upload__file,
-.mri-upload__error {
-  margin-top: 0.75rem;
+.speech-upload__file {
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+  color: #334155;
+  word-break: break-all;
 }
 
-.mri-upload__error {
+.speech-upload__error {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
   color: #b91c1c;
 }
 `;
