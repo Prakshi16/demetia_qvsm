@@ -31,6 +31,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import DashboardPlaceholder from "./pages/DashboardPlaceholder";
+import NewVisitScreening from "./pages/NewVisitScreening";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import "./App.css";
@@ -51,6 +52,16 @@ export default function App() {
         }
       >
         <Route path="/" element={<DashboardPlaceholder />} />
+
+        {/* §6 screen 5. Deliberately NOT /patients/:patientId or /visits/:visitId
+            — those two paths are reserved for Govind's screens, which other
+            screens (including this one's back link) already link to.
+            ?visitId=... resumes an awaiting_uploads visit (Product Rule 2A). */}
+        <Route
+          path="/patients/:patientId/new-visit/screening"
+          element={<NewVisitScreening />}
+        />
+
         {/* GOVIND: add /patients/:patientId and /visits/:visitId here. */}
       </Route>
 
