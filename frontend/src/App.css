@@ -799,3 +799,119 @@
 .detail-grid + .visit-form {
   margin-top: 20px;
 }
+
+/* --- hospital identity in the nav bar (fault #4) ---------------------- */
+
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+.nav-hospital {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  color: var(--text);
+  text-decoration: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  min-width: 0;
+}
+
+.nav-hospital:hover {
+  border-color: var(--border-strong);
+}
+
+.nav-hospital-logo {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.nav-hospital-logo--fallback {
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.nav-hospital-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-hospital-city {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+/* --- hospital profile screen --------------------------------------------- */
+
+.hospital-identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.hospital-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
+
+.hospital-logo--empty {
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  background: var(--bg);
+}
+
+.hospital-logo-pick {
+  display: inline-block;
+}
+
+.staff-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0 20px;
+  font-size: 0.9rem;
+}
+
+.staff-table th,
+.staff-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.staff-table th {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.staff-credential {
+  padding: 12px 14px;
+  margin: 12px 0;
+  background: var(--accent-soft);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.staff-credential p {
+  margin: 0 0 8px;
+}

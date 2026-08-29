@@ -14,7 +14,16 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db import get_db
-from app.routers import auth, dashboard, patients, visits, speech, mri_upload
+from app.routers import (
+    auth,
+    dashboard,
+    hospital,
+    mri_upload,
+    patients,
+    speech,
+    users,
+    visits,
+)
 from app.services.prediction import USE_REAL_MODEL, warm_models
 
 # Without this the app's own loggers propagate to an unconfigured root logger and
@@ -79,6 +88,8 @@ def health(db: Session = Depends(get_db)) -> dict:
 
 # Feature routers (§5). Upload endpoints (Bishal/Sheetal) mount onto visits later.
 api_router.include_router(auth.router)
+api_router.include_router(users.router)
+api_router.include_router(hospital.router)
 api_router.include_router(patients.router)
 api_router.include_router(visits.router)
 api_router.include_router(speech.router)

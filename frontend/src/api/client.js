@@ -125,10 +125,22 @@ export const api = {
   registerHospital: (body) =>
     request("/auth/register-hospital", { method: "POST", body, auth: false }),
 
-  registerStaff: (body) =>
-    request("/auth/register-staff", { method: "POST", body, auth: false }),
-
   login: (body) => request("/auth/login", { method: "POST", body, auth: false }),
+
+  // Authenticated. Returns a fresh { token, user } with must_change_password
+  // cleared, so the caller must re-store the session.
+  changePassword: (body) =>
+    request("/auth/change-password", { method: "POST", body }),
+
+  // --- hospital (fault #4) --------------------------------------------------
+  getHospital: () => request("/hospital"),
+  updateHospital: (body) => request("/hospital", { method: "PATCH", body }),
+
+  // --- staff management, hospital_admin only (fault #5) -------------------
+  listStaff: () => request("/users"),
+  createStaff: (body) => request("/users", { method: "POST", body }),
+  resetStaffPassword: (id, body) =>
+    request(`/users/${id}/reset-password`, { method: "POST", body }),
 
   // --- everything else ---------------------------------------------------
   // Add the patient/visit/dashboard calls here as the screens that need them
@@ -173,5 +185,27 @@ export const api = {
   saveDiagnosis: (visitId, body) =>
     request(`/visits/${visitId}/diagnosis`, { method: "POST", body }),
 };
+
+/**
+ * Hospital logo upload. Multipart FormData can't go through `request()` (same
+ * reason as the MRI/speech uploads), so it builds the URL + auth header itself.
+ * Returns the updated HospitalDetailOut.
+ */
+export async function uploadHospitalLogo(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${BASE_URL}/hospital/logo`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${getToken()}` },
+    body: formData,
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new ApiError(readErrorMessage(payload, response.status), response.status);
+  }
+  return payload;
+}
 
 export { request };

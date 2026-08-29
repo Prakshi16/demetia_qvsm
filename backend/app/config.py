@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_KEY: str
     SUPABASE_BUCKET: str = "patient-uploads"
+    # Separate PUBLIC bucket for hospital logos — the MRI/audio bucket is private
+    # and its URLs would 401 in an <img> tag.
+    SUPABASE_PUBLIC_BUCKET: str = "public-assets"
 
     # JWT signing. 24h expiry, no refresh token (Phase 2 §2 simplification note).
     JWT_SECRET: str

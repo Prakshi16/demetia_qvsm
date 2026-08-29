@@ -16,6 +16,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { api } from "../api/client";
+import { validatePersonName } from "../utils/validate";
 
 // Matches the consent_given_by Postgres enum ("patient" | "guardian").
 const CONSENT_PATIENT = "patient";
@@ -57,6 +58,13 @@ export default function RegisterPatient() {
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
+
+    const nameError = validatePersonName(form.name);
+    if (nameError) {
+      setError(nameError);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {

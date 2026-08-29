@@ -160,23 +160,62 @@ def run(client: httpx.Client) -> None:
     check("health: db and model both ok",
           health.get("db") == "ok" and health.get("model") == "ok", str(health))
 
-    # -- register hospital -> admin, then a clinician and a receptionist ----
+    # -- register hospital -> admin, then admin provisions the staff ---------
     response = client.post(f"{BASE}/auth/register-hospital", json={
         "hospital_name": f"{PREFIX} E2E {TAG}", "address": "temp",
+        "pincode": "560017", "city": "Bengaluru",
         "admin_name": "Admin", "admin_email": f"admin.{TAG}@smoke.test",
         "password": "smoketest123"})
     response.raise_for_status()
-    hospital_id = response.json()["user"]["hospital_id"]
+    admin = {"Authorization": f"Bearer {response.json()['token']}"}
+
+    # fault #7: same name + same pincode is a duplicate; same name + a different
+    # pincode is a branch and is allowed.
+    dupe = client.post(f"{BASE}/auth/register-hospital", json={
+        "hospital_name": f"{PREFIX} E2E {TAG}", "address": "temp",
+        "pincode": "560017", "admin_name": "Admin2",
+        "admin_email": f"admin2.{TAG}@smoke.test", "password": "smoketest123"})
+    check("fault #7: same hospital name + same pincode -> 409",
+          dupe.status_code == 409, str(dupe.status_code))
+    branch = client.post(f"{BASE}/auth/register-hospital", json={
+        "hospital_name": f"{PREFIX} E2E {TAG}", "address": "temp",
+        "pincode": "560066", "admin_name": "Branch Admin",
+        "admin_email": f"branch.{TAG}@smoke.test", "password": "smoketest123"})
+    check("fault #7: same name + different pincode -> branch allowed",
+          branch.status_code == 200, str(branch.status_code))
+
+    # fault #6: a digits-only name is rejected.
+    bad_name = client.post(f"{BASE}/auth/register-hospital", json={
+        "hospital_name": "123456", "pincode": "560099", "admin_name": "X Y",
+        "admin_email": f"badname.{TAG}@smoke.test", "password": "smoketest123"})
+    check("fault #6: digits-only hospital name -> 422",
+          bad_name.status_code == 422, str(bad_name.status_code))
 
     staff = {}
     for role in ("clinician", "receptionist"):
-        response = client.post(f"{BASE}/auth/register-staff", json={
-            "hospital_id": hospital_id, "name": role.title(),
-            "email": f"{role}.{TAG}@smoke.test", "password": "smoketest123",
-            "role": role})
-        response.raise_for_status()
-        staff[role] = {"Authorization": f"Bearer {response.json()['token']}"}
-    check("hospital + clinician + receptionist registered", len(staff) == 2)
+        email = f"{role}.{TAG}@smoke.test"
+        created = client.post(f"{BASE}/users", headers=admin, json={
+            "name": role.title(), "email": email, "role": role,
+            "temporary_password": "temp-pass-123"})
+        created.raise_for_status()
+        check(f"provisioned {role} must set a password on first sign-in",
+              created.json()["must_change_password"] is True)
+
+        # first sign-in with the temp password, then the forced change
+        login_resp = client.post(f"{BASE}/auth/login", json={
+            "email": email, "password": "temp-pass-123"})
+        login_resp.raise_for_status()
+        check(f"{role} login token flags must_change_password",
+              login_resp.json()["user"]["must_change_password"] is True)
+        temp_headers = {"Authorization": f"Bearer {login_resp.json()['token']}"}
+
+        changed = client.post(f"{BASE}/auth/change-password", headers=temp_headers, json={
+            "current_password": "temp-pass-123", "new_password": "smoketest123"})
+        changed.raise_for_status()
+        check(f"{role} change-password clears the flag",
+              changed.json()["user"]["must_change_password"] is False)
+        staff[role] = {"Authorization": f"Bearer {changed.json()['token']}"}
+    check("hospital + clinician + receptionist provisioned", len(staff) == 2)
 
     doctor, desk = staff["clinician"], staff["receptionist"]
 
@@ -337,8 +376,8 @@ def run(client: httpx.Client) -> None:
     # -- Rule 12: a second hospital cannot see the first one's patient -----
     response = client.post(f"{BASE}/auth/register-hospital", json={
         "hospital_name": f"{PREFIX} Other {TAG}", "address": "temp",
-        "admin_name": "Other", "admin_email": f"other.{TAG}@smoke.test",
-        "password": "smoketest123"})
+        "pincode": "110001", "admin_name": "Other",
+        "admin_email": f"other.{TAG}@smoke.test", "password": "smoketest123"})
     response.raise_for_status()
     outsider = {"Authorization": f"Bearer {response.json()['token']}"}
 
