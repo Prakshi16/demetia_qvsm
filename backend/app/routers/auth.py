@@ -1,5 +1,9 @@
-"""Auth + public hospital list (§5). All three auth endpoints return a JWT so the
-client is logged in immediately after register/login (no separate login step).
+"""Auth + public hospital list (§5).
+
+``register-hospital`` and ``login`` return a JWT so the client is logged in
+immediately. Staff accounts are no longer self-service — a ``hospital_admin``
+provisions them via ``POST /users`` (see routers/users.py) and the new staff
+member is forced through ``POST /auth/change-password`` on first sign-in.
 """
 from __future__ import annotations
 
@@ -8,16 +12,18 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.deps import CurrentUser, get_current_user
 from app.models import Hospital, User
 from app.schemas import (
+    ChangePasswordRequest,
     HospitalOut,
     LoginRequest,
     RegisterHospitalRequest,
-    RegisterStaffRequest,
     TokenResponse,
     UserOut,
 )
 from app.security import create_access_token, hash_password, verify_password
+from app.services.hospitals import assert_hospital_name_available
 
 router = APIRouter(tags=["auth"])
 
@@ -28,13 +34,15 @@ def _token_for(user: User) -> TokenResponse:
         hospital_id=user.hospital_id,
         role=user.role,
         name=user.name,
+        must_change_password=user.must_change_password,
     )
     return TokenResponse(token=token, user=UserOut.model_validate(user))
 
 
 @router.get("/hospitals", response_model=list[HospitalOut])
 def list_hospitals(db: Session = Depends(get_db)) -> list[Hospital]:
-    """Public — powers the sign-up hospital picker. No auth required."""
+    """Public. Kept for an 'is my hospital already registered?' check — sign-up
+    no longer uses a picker (staff can't self-join)."""
     return db.query(Hospital).order_by(Hospital.name).all()
 
 
@@ -43,7 +51,16 @@ def register_hospital(
     body: RegisterHospitalRequest, db: Session = Depends(get_db)
 ) -> TokenResponse:
     """Create a hospital and its first user (a ``hospital_admin``)."""
-    hospital = Hospital(name=body.hospital_name, address=body.address)
+    assert_hospital_name_available(
+        db, name=body.hospital_name, pincode=body.pincode
+    )
+
+    hospital = Hospital(
+        name=body.hospital_name,
+        address=body.address,
+        pincode=body.pincode,
+        city=body.city,
+    )
     db.add(hospital)
     db.flush()  # assign hospital.id before creating the admin user
 
@@ -53,6 +70,7 @@ def register_hospital(
         email=body.admin_email,
         password_hash=hash_password(body.password),
         role="hospital_admin",
+        must_change_password=False,
     )
     db.add(admin)
     try:
@@ -67,37 +85,6 @@ def register_hospital(
     return _token_for(admin)
 
 
-@router.post("/auth/register-staff", response_model=TokenResponse)
-def register_staff(
-    body: RegisterStaffRequest, db: Session = Depends(get_db)
-) -> TokenResponse:
-    """Self-service staff sign-up under an existing hospital (no approval step)."""
-    hospital = db.get(Hospital, body.hospital_id)
-    if hospital is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Hospital not found"
-        )
-
-    user = User(
-        hospital_id=body.hospital_id,
-        name=body.name,
-        email=body.email,
-        password_hash=hash_password(body.password),
-        role=body.role,  # schema restricts to receptionist/clinician
-    )
-    db.add(user)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered",
-        )
-    db.refresh(user)
-    return _token_for(user)
-
-
 @router.post("/auth/login", response_model=TokenResponse)
 def login(body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     """Email + password. Role is read from the record, never chosen at sign-in."""
@@ -107,4 +94,36 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
+    return _token_for(user)
+
+
+@router.post("/auth/change-password", response_model=TokenResponse)
+def change_password(
+    body: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(get_current_user),
+) -> TokenResponse:
+    """Change your own password. Clears ``must_change_password`` and returns a
+    fresh token so the client's forced-change gate lifts."""
+    user = db.get(User, current.user_id)
+    if user is None:  # token valid but the account is gone
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+        )
+
+    if not verify_password(body.current_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+    if verify_password(body.new_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from the current one",
+        )
+
+    user.password_hash = hash_password(body.new_password)
+    user.must_change_password = False
+    db.commit()
+    db.refresh(user)
     return _token_for(user)

@@ -15,7 +15,9 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./auth/ProtectedRoute";
+import ChangePassword from "./pages/ChangePassword";
 import Dashboard from "./pages/Dashboard";
+import HospitalProfile from "./pages/HospitalProfile";
 import NewVisitFollowUp from "./pages/NewVisitFollowUp";
 import NewVisitScreening from "./pages/NewVisitScreening";
 import PatientProfile from "./pages/PatientProfile";
@@ -41,6 +43,11 @@ export default function App() {
         }
       >
         <Route path="/" element={<Dashboard />} />
+
+        {/* Forced first-login password change (fault #5) + hospital identity
+            and staff management (faults #4/#5). */}
+        <Route path="/change-password" element={<ChangePassword />} />
+        <Route path="/hospital" element={<HospitalProfile />} />
 
         {/* §6 screen 3. A static segment, so React Router ranks it above
             Govind's /patients/:patientId and it won't be swallowed by it. */}

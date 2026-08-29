@@ -563,7 +563,7 @@
 
 .staff-row {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: 1fr 1fr auto auto auto;
   gap: 8px 16px;
   align-items: center;
   padding: 12px 0;
@@ -585,7 +585,6 @@
 }
 
 .staff-role {
-  justify-self: end;
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 0.75rem;
@@ -602,12 +601,19 @@
   border-color: #c4ddf3;
 }
 
-@media (max-width: 33rem) {
+.staff-pw {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 40rem) {
   .staff-row {
     grid-template-columns: 1fr auto;
   }
 
-  .staff-email {
+  .staff-email,
+  .staff-pw {
     grid-column: 1 / -1;
   }
 }
@@ -859,4 +865,101 @@
    reviewed visit, and needs a gap so the two don't read as one block. */
 .detail-grid + .visit-form {
   margin-top: 20px;
+}
+
+/* --- hospital identity in the nav bar (fault #4) ---------------------- */
+
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+.nav-hospital {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  color: var(--text);
+  text-decoration: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  min-width: 0;
+}
+
+.nav-hospital:hover {
+  border-color: var(--border-strong);
+}
+
+.nav-hospital-logo {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.nav-hospital-logo--fallback {
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.nav-hospital-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-hospital-city {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+/* --- hospital profile screen --------------------------------------------- */
+
+.hospital-identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.hospital-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
+
+.hospital-logo--empty {
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  background: var(--bg);
+}
+
+.hospital-logo-pick {
+  display: inline-block;
+}
+
+.staff-credential {
+  padding: 12px 14px;
+  margin: 12px 0;
+  background: var(--accent-soft);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.staff-credential p {
+  margin: 0 0 8px;
 }

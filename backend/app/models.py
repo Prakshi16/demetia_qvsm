@@ -56,6 +56,11 @@ class Hospital(Base):
     id: Mapped[uuid.UUID] = _uuid_pk()
     name: Mapped[str] = mapped_column(String, nullable=False)
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # pincode is the branch discriminator (see migration 003): (name, pincode) is
+    # unique. city is display only. logo_url is a public Supabase Storage URL.
+    pincode: Mapped[str | None] = mapped_column(Text, nullable=True)
+    city: Mapped[str | None] = mapped_column(Text, nullable=True)
+    logo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -77,6 +82,11 @@ class User(Base):
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String, nullable=False)
     role: Mapped[str] = mapped_column(_enum(*ROLE, name="role"), nullable=False)
+    # Set when an admin provisions or resets this account; the client forces a
+    # password change on next sign-in and POST /auth/change-password clears it.
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

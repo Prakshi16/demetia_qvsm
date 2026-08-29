@@ -7,17 +7,73 @@ Phase 2 demo and the DB's UNIQUE(email) is the real guard.
 """
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import date, datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 # Literals mirror the Postgres ENUM value sets in models.py / 001_init.sql.
 StaffRole = Literal["receptionist", "clinician"]
 ConsentGivenBy = Literal["patient", "guardian"]
 VisitType = Literal["screening", "follow_up"]
 DoctorDiagnosis = Literal["Nondemented", "Demented", "Needs further evaluation"]
+
+MIN_PASSWORD_LENGTH = 8
+
+# Allowed punctuation in a person's name vs an organisation's name. Neither list
+# is about "correctness" — it's a sanity gate so a name can't be digits-only,
+# blank, or a wall of symbols. The frontend mirrors these in utils/validate.js.
+_PERSON_NAME_EXTRA = set(" -'.")
+_ORG_NAME_EXTRA = set(" -'.,&()/#")
+_WHITESPACE_RUN = re.compile(r"\s+")
+
+
+def _clean_name(value: str, *, kind: str, extra: set[str], max_len: int) -> str:
+    """Trim, collapse internal whitespace, and reject nonsense (see above)."""
+    cleaned = _WHITESPACE_RUN.sub(" ", (value or "").strip())
+    if len(cleaned) < 2 or len(cleaned) > max_len:
+        raise ValueError(f"{kind} must be between 2 and {max_len} characters")
+    if not any(ch.isalpha() for ch in cleaned):
+        raise ValueError(f"{kind} must contain at least one letter")
+    bad = {ch for ch in cleaned if not (ch.isalpha() or ch.isdigit() or ch in extra)}
+    if bad:
+        raise ValueError(f"{kind} contains invalid characters: {''.join(sorted(bad))}")
+    return cleaned
+
+
+def clean_person_name(value: str) -> str:
+    return _clean_name(value, kind="Name", extra=_PERSON_NAME_EXTRA, max_len=100)
+
+
+def clean_org_name(value: str) -> str:
+    return _clean_name(
+        value, kind="Hospital name", extra=_ORG_NAME_EXTRA, max_len=120
+    )
+
+
+def clean_pincode(value: str) -> str:
+    cleaned = re.sub(r"\s+", "", value or "")
+    if not re.fullmatch(r"\d{6}", cleaned):
+        raise ValueError("Pincode must be exactly 6 digits")
+    return cleaned
+
+
+def validate_password(value: str) -> str:
+    if value is None or len(value) < MIN_PASSWORD_LENGTH or not value.strip():
+        raise ValueError(
+            f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
+        )
+    return value
+
+
+def clean_org_name_optional(value: Optional[str]) -> Optional[str]:
+    return None if value is None else clean_org_name(value)
+
+
+def clean_pincode_optional(value: Optional[str]) -> Optional[str]:
+    return None if value is None else clean_pincode(value)
 
 
 # --------------------------------------------------------------------------- #
@@ -26,17 +82,16 @@ DoctorDiagnosis = Literal["Nondemented", "Demented", "Needs further evaluation"]
 class RegisterHospitalRequest(BaseModel):
     hospital_name: str
     address: Optional[str] = None
+    pincode: str
+    city: Optional[str] = None
     admin_name: str
     admin_email: str
     password: str
 
-
-class RegisterStaffRequest(BaseModel):
-    hospital_id: uuid.UUID
-    name: str
-    email: str
-    password: str
-    role: StaffRole  # hospital_admin is created only via register-hospital
+    _v_name = field_validator("hospital_name")(clean_org_name)
+    _v_admin = field_validator("admin_name")(clean_person_name)
+    _v_pin = field_validator("pincode")(clean_pincode)
+    _v_pw = field_validator("password")(validate_password)
 
 
 class LoginRequest(BaseModel):
@@ -47,13 +102,17 @@ class LoginRequest(BaseModel):
 # --------------------------------------------------------------------------- #
 # Staff management (hospital_admin only) — §5. The admin never touches patient
 # data; these endpoints are the admin's whole job: the clinicians and
-# receptionists at their own hospital.
+# receptionists at their own hospital. Accounts are provisioned with a temporary
+# password and land with must_change_password set (fault #5).
 # --------------------------------------------------------------------------- #
 class StaffCreate(BaseModel):
     name: str
     email: str
-    password: str
+    temporary_password: str
     role: StaffRole  # receptionist | clinician — an admin cannot mint another admin
+
+    _v_name = field_validator("name")(clean_person_name)
+    _v_pw = field_validator("temporary_password")(validate_password)
 
 
 class StaffListItem(BaseModel):
@@ -63,7 +122,21 @@ class StaffListItem(BaseModel):
     name: str
     email: str
     role: str
+    must_change_password: bool
     created_at: datetime
+
+
+class ResetPasswordRequest(BaseModel):
+    new_password: str
+
+    _v_pw = field_validator("new_password")(validate_password)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+    _v_pw = field_validator("new_password")(validate_password)
 
 
 class UserOut(BaseModel):
@@ -74,6 +147,7 @@ class UserOut(BaseModel):
     name: str
     email: str
     role: str
+    must_change_password: bool = False
 
 
 class TokenResponse(BaseModel):
@@ -82,12 +156,39 @@ class TokenResponse(BaseModel):
 
 
 class HospitalOut(BaseModel):
-    """Public — powers the sign-up hospital picker (GET /hospitals)."""
+    """Public — GET /hospitals (kept for an "is my hospital already registered?"
+    check; sign-up no longer uses a picker)."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     name: str
+    city: Optional[str] = None
+    pincode: Optional[str] = None
+
+
+class HospitalDetailOut(BaseModel):
+    """The caller's own hospital (GET /hospital) — powers the nav bar + profile."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    address: Optional[str] = None
+    city: Optional[str] = None
+    pincode: Optional[str] = None
+    logo_url: Optional[str] = None
+    created_at: datetime
+
+
+class HospitalUpdate(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    pincode: Optional[str] = None
+
+    _v_name = field_validator("name")(clean_org_name_optional)
+    _v_pin = field_validator("pincode")(clean_pincode_optional)
 
 
 # --------------------------------------------------------------------------- #
@@ -101,6 +202,8 @@ class PatientCreate(BaseModel):
     address: Optional[str] = None
     consent_given_by: ConsentGivenBy
     consent_relationship: Optional[str] = None
+
+    _v_name = field_validator("name")(clean_person_name)
 
     @model_validator(mode="after")
     def _require_relationship_for_guardian(self) -> "PatientCreate":

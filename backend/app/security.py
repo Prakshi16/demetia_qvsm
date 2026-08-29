@@ -30,15 +30,26 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def create_access_token(
-    *, user_id: uuid.UUID, hospital_id: uuid.UUID, role: str, name: str
+    *,
+    user_id: uuid.UUID,
+    hospital_id: uuid.UUID,
+    role: str,
+    name: str,
+    must_change_password: bool = False,
 ) -> str:
-    """Sign a JWT carrying the §5 payload. Expiry is JWT_EXPIRE_HOURS from now."""
+    """Sign a JWT carrying the §5 payload. Expiry is JWT_EXPIRE_HOURS from now.
+
+    ``must_change_password`` rides in the token so the current-user dependency can
+    gate on it without a per-request DB read; POST /auth/change-password issues a
+    fresh token once it's cleared.
+    """
     now = datetime.now(timezone.utc)
     payload = {
         "user_id": str(user_id),
         "hospital_id": str(hospital_id),
         "role": role,
         "name": name,
+        "must_change_password": must_change_password,
         "exp": now + timedelta(hours=settings.JWT_EXPIRE_HOURS),
         "iat": now,
     }

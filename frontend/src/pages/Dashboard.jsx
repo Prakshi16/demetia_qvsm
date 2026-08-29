@@ -26,6 +26,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import PatientList from "../components/PatientList";
 import { useAuth } from "../auth/useAuth";
+import { validatePassword, validatePersonName } from "../utils/validate";
 
 const ROLE_LABEL = {
   clinician: "Clinician",
@@ -242,18 +243,23 @@ export default function Dashboard() {
   );
 }
 
-const EMPTY_STAFF_FORM = { name: "", email: "", password: "", role: "clinician" };
+const EMPTY_STAFF_FORM = { name: "", email: "", temporary_password: "", role: "clinician" };
 
 /**
  * The hospital_admin's whole dashboard. No patient data: an admin's job is the
  * people at their hospital. `staff` is the { items, isLoading, error } shape
  * usePatientQuery returns; `onStaffAdded` re-runs that query after a successful
  * add so the new row shows without a reload.
+ *
+ * Accounts are provisioned with a temporary password (kept masked here); the new
+ * user is forced to change it on first sign-in. After an add or a reset, the
+ * one-time credential panel repeats the email + password to hand over.
  */
 function AdminDashboard({ name, staff, onStaffAdded }) {
   const [form, setForm] = useState(EMPTY_STAFF_FORM);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [credential, setCredential] = useState(null);
 
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -262,20 +268,46 @@ function AdminDashboard({ name, staff, onStaffAdded }) {
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
+    setCredential(null);
+
+    const nameError = validatePersonName(form.name);
+    const pwError = validatePassword(form.temporary_password);
+    if (nameError) return setError(nameError);
+    if (pwError) return setError(pwError);
+
     setIsSubmitting(true);
     try {
-      await api.addStaff({
+      const created = await api.addStaff({
         name: form.name.trim(),
         email: form.email.trim(),
-        password: form.password,
+        temporary_password: form.temporary_password,
         role: form.role,
       });
+      setCredential({ email: created.email, password: form.temporary_password });
       setForm(EMPTY_STAFF_FORM);
       onStaffAdded();
     } catch (submitError) {
       setError(submitError.message);
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function resetPassword(member) {
+    const next = window.prompt(
+      `New temporary password for ${member.name} (min 8 characters):`,
+    );
+    if (next === null) return;
+    const pwError = validatePassword(next);
+    if (pwError) return setError(pwError);
+
+    setError("");
+    try {
+      await api.resetStaffPassword(member.id, { new_password: next });
+      setCredential({ email: member.email, password: next });
+      onStaffAdded();
+    } catch (submitError) {
+      setError(submitError.message);
     }
   }
 
@@ -288,6 +320,9 @@ function AdminDashboard({ name, staff, onStaffAdded }) {
           Manage the clinicians and receptionists at your hospital. Patient
           records aren’t part of the admin role.
         </p>
+        <Link className="back-link" to="/hospital">
+          Hospital profile →
+        </Link>
       </header>
 
       <section className="visit-card">
@@ -297,6 +332,31 @@ function AdminDashboard({ name, staff, onStaffAdded }) {
             <span className="visit-chip">{staff.items.length}</span>
           )}
         </div>
+
+        {credential ? (
+          <div className="staff-credential">
+            <p>
+              Share these over a trusted channel — the account must set a new
+              password on first sign-in.
+            </p>
+            <p className="mono">
+              {credential.email}
+              <br />
+              {credential.password}
+            </p>
+            <button
+              type="button"
+              className="button-quiet"
+              onClick={() =>
+                navigator.clipboard?.writeText(
+                  `${credential.email} / ${credential.password}`,
+                )
+              }
+            >
+              Copy
+            </button>
+          </div>
+        ) : null}
 
         {staff.error ? (
           <p className="form-error" role="alert">
@@ -315,6 +375,22 @@ function AdminDashboard({ name, staff, onStaffAdded }) {
                 <span className={`staff-role staff-role--${member.role}`}>
                   {ROLE_LABEL[member.role] ?? member.role}
                 </span>
+                {member.role === "hospital_admin" ? (
+                  <span className="staff-pw" />
+                ) : (
+                  <>
+                    <span className="staff-pw">
+                      {member.must_change_password ? "Temporary" : "Set"}
+                    </span>
+                    <button
+                      type="button"
+                      className="button-quiet"
+                      onClick={() => resetPassword(member)}
+                    >
+                      Reset password
+                    </button>
+                  </>
+                )}
               </li>
             ))}
           </ul>
@@ -357,10 +433,10 @@ function AdminDashboard({ name, staff, onStaffAdded }) {
             <label className="field">
               <span className="field-label">Temporary password</span>
               <input
-                type="text"
-                value={form.password}
-                onChange={(event) => updateField("password", event.target.value)}
-                autoComplete="off"
+                type="password"
+                value={form.temporary_password}
+                onChange={(event) => updateField("temporary_password", event.target.value)}
+                autoComplete="new-password"
                 required
                 minLength={8}
                 disabled={isSubmitting}

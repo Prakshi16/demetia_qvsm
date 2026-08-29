@@ -21,6 +21,13 @@ export default function ProtectedRoute({ roles, children }) {
     return <Navigate to="/signin" state={{ from: location.pathname }} replace />;
   }
 
+  // Admin-provisioned accounts (fault #5): until the temporary password is
+  // replaced, the only screen reachable is /change-password. Sign-out still
+  // works, and anyone may visit /change-password voluntarily.
+  if (user.must_change_password && location.pathname !== "/change-password") {
+    return <Navigate to="/change-password" replace />;
+  }
+
   if (roles && !roles.includes(user.role)) {
     return <Navigate to="/" replace />;
   }

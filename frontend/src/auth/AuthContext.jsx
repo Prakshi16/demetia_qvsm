@@ -56,8 +56,10 @@ export function AuthProvider({ children }) {
     [acceptSession],
   );
 
-  const registerStaff = useCallback(
-    async (body) => acceptSession(await api.registerStaff(body)),
+  // Change-password returns a fresh { token, user } with must_change_password
+  // cleared — re-store it so the forced-change gate in ProtectedRoute lifts.
+  const changePassword = useCallback(
+    async (body) => acceptSession(await api.changePassword(body)),
     [acceptSession],
   );
 
@@ -68,9 +70,9 @@ export function AuthProvider({ children }) {
       signIn,
       signOut,
       registerHospital,
-      registerStaff,
+      changePassword,
     }),
-    [user, signIn, signOut, registerHospital, registerStaff],
+    [user, signIn, signOut, registerHospital, changePassword],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

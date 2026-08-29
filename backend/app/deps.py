@@ -39,6 +39,7 @@ class CurrentUser:
     hospital_id: uuid.UUID
     role: str
     name: str
+    must_change_password: bool = False
 
 
 _UNAUTHENTICATED = HTTPException(
@@ -61,6 +62,7 @@ def get_current_user(
             hospital_id=uuid.UUID(claims["hospital_id"]),
             role=claims["role"],
             name=claims["name"],
+            must_change_password=bool(claims.get("must_change_password", False)),
         )
     except (InvalidTokenError, KeyError, ValueError):
         # bad signature, expired, or a malformed/incomplete payload
