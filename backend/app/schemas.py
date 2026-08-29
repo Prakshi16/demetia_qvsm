@@ -44,6 +44,28 @@ class LoginRequest(BaseModel):
     password: str
 
 
+# --------------------------------------------------------------------------- #
+# Staff management (hospital_admin only) — §5. The admin never touches patient
+# data; these endpoints are the admin's whole job: the clinicians and
+# receptionists at their own hospital.
+# --------------------------------------------------------------------------- #
+class StaffCreate(BaseModel):
+    name: str
+    email: str
+    password: str
+    role: StaffRole  # receptionist | clinician — an admin cannot mint another admin
+
+
+class StaffListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    email: str
+    role: str
+    created_at: datetime
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

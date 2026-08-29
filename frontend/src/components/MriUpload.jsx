@@ -14,6 +14,11 @@ const STATUS = {
 };
 
 const ACCEPTED_EXTENSIONS = [".nii", ".nii.gz", ".dcm", ".dicom", ".mgh", ".mgz"];
+// The native file picker matches `accept` tokens against the segment after the
+// LAST dot, so ".nii.gz" never matches a real file — the OS sees "gz" and greys
+// it out. List the trailing single extensions (plus a MIME) for the picker;
+// validateFile() still enforces the stricter compound list above.
+const PICKER_ACCEPT = ".nii,.nii.gz,.gz,.dcm,.dicom,.mgh,.mgz,application/gzip";
 // 50 MB — the Supabase free-tier per-file storage limit, matching the
 // backend's own cap so an oversized file fails here rather than mid-upload.
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
@@ -135,7 +140,7 @@ export default function MriUpload({ visitId, onDone }) {
         id={inputId}
         className="mri-upload__input"
         type="file"
-        accept={ACCEPTED_EXTENSIONS.join(",")}
+        accept={PICKER_ACCEPT}
         onChange={handleInputChange}
         disabled={isBusy}
       />

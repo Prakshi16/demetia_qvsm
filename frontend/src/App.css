@@ -551,6 +551,67 @@
   font-size: 0.9rem;
 }
 
+/* --- Staff roster (hospital_admin dashboard) --- */
+
+.staff-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.staff-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px 16px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.staff-row:last-child {
+  border-bottom: none;
+}
+
+.staff-name {
+  font-weight: 600;
+}
+
+.staff-email {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.staff-role {
+  justify-self: end;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.staff-role--clinician {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: #c4ddf3;
+}
+
+@media (max-width: 33rem) {
+  .staff-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .staff-email {
+    grid-column: 1 / -1;
+  }
+}
+
 /* --- Patient Profile (§6 screen 4) --- */
 
 .profile-actions {

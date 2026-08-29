@@ -83,6 +83,7 @@ def _require_role(role: str):
 
 require_clinician = _require_role("clinician")
 require_receptionist = _require_role("receptionist")
+require_hospital_admin = _require_role("hospital_admin")
 
 
 def get_scoped_query(

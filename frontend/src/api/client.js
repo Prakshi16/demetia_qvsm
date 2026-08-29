@@ -130,6 +130,14 @@ export const api = {
 
   login: (body) => request("/auth/login", { method: "POST", body, auth: false }),
 
+  // --- staff (§5) — hospital_admin only --------------------------------
+  // The admin's dashboard: the clinicians and receptionists at their own
+  // hospital. addStaff creates the account in the caller's hospital (never one
+  // named in the body) and does NOT log the admin in as the new user.
+  listStaff: () => request("/staff"),
+
+  addStaff: (body) => request("/staff", { method: "POST", body }),
+
   // --- everything else ---------------------------------------------------
   // Add the patient/visit/dashboard calls here as the screens that need them
   // get built, so no component ever calls fetch() directly.

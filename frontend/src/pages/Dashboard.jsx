@@ -12,6 +12,10 @@
  *                  this is a separate list and not a filter toggle on the one
  *                  below it, and the two never overlap: a visit is either
  *                  missing a modality or waiting for a doctor, never both.
+ *   hospital_admin — no patient data at all. The admin manages people: the
+ *                  clinicians and receptionists at their hospital, over /staff.
+ *                  This is a full early return; none of the patient sections
+ *                  below render for an admin.
  *
  * The queues are separate endpoints, so they get their own search state. A
  * single shared search box would suggest they are two views of one list.
@@ -22,6 +26,12 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import PatientList from "../components/PatientList";
 import { useAuth } from "../auth/useAuth";
+
+const ROLE_LABEL = {
+  clinician: "Clinician",
+  receptionist: "Receptionist",
+  hospital_admin: "Hospital admin",
+};
 
 /** Debounced fetch of one list. Returns { items, isLoading, error }. */
 function usePatientQuery(fetcher, search, enabled = true) {
@@ -78,13 +88,32 @@ export default function Dashboard() {
   const { user } = useAuth();
   const isClinician = user.role === "clinician";
   const isReceptionist = user.role === "receptionist";
+  const isHospitalAdmin = user.role === "hospital_admin";
 
   const [generalSearch, setGeneralSearch] = useState("");
   const [queueSearch, setQueueSearch] = useState("");
 
-  const general = usePatientQuery(api.getDashboard, generalSearch);
+  // An admin never hits /dashboard — it returns patient data they have no
+  // business seeing. Gating the query keeps that request from firing at all.
+  const general = usePatientQuery(api.getDashboard, generalSearch, !isHospitalAdmin);
   const review = usePatientQuery(api.getPendingReview, queueSearch, isClinician);
   const incomplete = usePatientQuery(api.getIncompleteVisits, "", isReceptionist);
+
+  // usePatientQuery is list-shaped and role-gated, which is exactly what the
+  // staff roster needs too — listStaff ignores the search arg, so `staffRefetch`
+  // is just a counter we bump to re-run the effect after adding someone.
+  const [staffRefetch, setStaffRefetch] = useState(0);
+  const staff = usePatientQuery(api.listStaff, String(staffRefetch), isHospitalAdmin);
+
+  if (isHospitalAdmin) {
+    return (
+      <AdminDashboard
+        name={user.name}
+        staff={staff}
+        onStaffAdded={() => setStaffRefetch((n) => n + 1)}
+      />
+    );
+  }
 
   return (
     <div className="page visit-page">
@@ -208,6 +237,159 @@ export default function Dashboard() {
             }
           />
         )}
+      </section>
+    </div>
+  );
+}
+
+const EMPTY_STAFF_FORM = { name: "", email: "", password: "", role: "clinician" };
+
+/**
+ * The hospital_admin's whole dashboard. No patient data: an admin's job is the
+ * people at their hospital. `staff` is the { items, isLoading, error } shape
+ * usePatientQuery returns; `onStaffAdded` re-runs that query after a successful
+ * add so the new row shows without a reload.
+ */
+function AdminDashboard({ name, staff, onStaffAdded }) {
+  const [form, setForm] = useState(EMPTY_STAFF_FORM);
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  function updateField(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError("");
+    setIsSubmitting(true);
+    try {
+      await api.addStaff({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        role: form.role,
+      });
+      setForm(EMPTY_STAFF_FORM);
+      onStaffAdded();
+    } catch (submitError) {
+      setError(submitError.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="page visit-page">
+      <header className="visit-header">
+        <p className="visit-eyebrow">Dashboard</p>
+        <h1>Welcome, {name}</h1>
+        <p className="visit-subtitle">
+          Manage the clinicians and receptionists at your hospital. Patient
+          records aren’t part of the admin role.
+        </p>
+      </header>
+
+      <section className="visit-card">
+        <div className="visit-card-head">
+          <h2>Staff</h2>
+          {staff.isLoading ? null : (
+            <span className="visit-chip">{staff.items.length}</span>
+          )}
+        </div>
+
+        {staff.error ? (
+          <p className="form-error" role="alert">
+            {staff.error}
+          </p>
+        ) : staff.isLoading ? (
+          <p className="list-note">Loading…</p>
+        ) : staff.items.length === 0 ? (
+          <p className="list-note">No staff yet. Add your first below.</p>
+        ) : (
+          <ul className="staff-list">
+            {staff.items.map((member) => (
+              <li key={member.id} className="staff-row">
+                <span className="staff-name">{member.name}</span>
+                <span className="staff-email">{member.email}</span>
+                <span className={`staff-role staff-role--${member.role}`}>
+                  {ROLE_LABEL[member.role] ?? member.role}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="visit-card">
+        <div className="visit-card-head">
+          <h2>Add a staff member</h2>
+        </div>
+
+        <form className="visit-form" onSubmit={handleSubmit}>
+          <div className="visit-form-row">
+            <label className="field">
+              <span className="field-label">Full name</span>
+              <input
+                type="text"
+                value={form.name}
+                onChange={(event) => updateField("name", event.target.value)}
+                autoComplete="off"
+                required
+                disabled={isSubmitting}
+              />
+            </label>
+
+            <label className="field">
+              <span className="field-label">Email</span>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(event) => updateField("email", event.target.value)}
+                autoComplete="off"
+                required
+                disabled={isSubmitting}
+              />
+            </label>
+          </div>
+
+          <div className="visit-form-row">
+            <label className="field">
+              <span className="field-label">Temporary password</span>
+              <input
+                type="text"
+                value={form.password}
+                onChange={(event) => updateField("password", event.target.value)}
+                autoComplete="off"
+                required
+                minLength={8}
+                disabled={isSubmitting}
+              />
+            </label>
+
+            <label className="field">
+              <span className="field-label">Role</span>
+              <select
+                value={form.role}
+                onChange={(event) => updateField("role", event.target.value)}
+                disabled={isSubmitting}
+              >
+                <option value="clinician">Clinician</option>
+                <option value="receptionist">Receptionist</option>
+              </select>
+            </label>
+          </div>
+
+          {error ? (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          ) : null}
+
+          <button type="submit" className="button-primary" disabled={isSubmitting}>
+            {isSubmitting ? "Adding…" : "Add staff member"}
+          </button>
+        </form>
       </section>
     </div>
   );
