@@ -110,9 +110,18 @@ button:focus-visible {
 
 .field input:disabled,
 .field select:disabled,
-.field textarea:disabled {
+.field textarea:disabled,
+.field input:read-only {
   background: #f3f5f8;
   color: var(--text-muted);
+}
+
+/* A read-only field is auto-filled, not editable — don't invite a click. */
+.field input:read-only {
+  cursor: default;
+}
+.field input:read-only:focus {
+  outline: none;
 }
 
 .button-primary {

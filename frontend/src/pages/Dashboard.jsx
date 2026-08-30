@@ -26,7 +26,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import PatientList from "../components/PatientList";
 import { useAuth } from "../auth/useAuth";
-import { validatePassword, validatePersonName } from "../utils/validate";
+import { slugLocalPart, validatePassword, validatePersonName } from "../utils/validate";
 
 const ROLE_LABEL = {
   clinician: "Clinician",
@@ -243,7 +243,7 @@ export default function Dashboard() {
   );
 }
 
-const EMPTY_STAFF_FORM = { name: "", email: "", temporary_password: "", role: "clinician" };
+const EMPTY_STAFF_FORM = { name: "", temporary_password: "", role: "clinician" };
 
 /**
  * The hospital_admin's whole dashboard. No patient data: an admin's job is the
@@ -254,12 +254,27 @@ const EMPTY_STAFF_FORM = { name: "", email: "", temporary_password: "", role: "c
  * Accounts are provisioned with a temporary password (kept masked here); the new
  * user is forced to change it on first sign-in. After an add or a reset, the
  * one-time credential panel repeats the email + password to hand over.
+ *
+ * The admin never types an email: the login address is derived from the name
+ * plus the hospital's fixed email domain, server-side. We fetch the domain only
+ * to preview that address before the add.
  */
 function AdminDashboard({ name, staff, onStaffAdded }) {
   const [form, setForm] = useState(EMPTY_STAFF_FORM);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [credential, setCredential] = useState(null);
+  const [domain, setDomain] = useState("");
+
+  useEffect(() => {
+    api
+      .getHospital()
+      .then((hospital) => setDomain(hospital.email_domain || ""))
+      .catch(() => setDomain(""));
+  }, []);
+
+  const localPart = slugLocalPart(form.name);
+  const derivedEmail = localPart && domain ? `${localPart}@${domain}` : "";
 
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -279,7 +294,6 @@ function AdminDashboard({ name, staff, onStaffAdded }) {
     try {
       const created = await api.addStaff({
         name: form.name.trim(),
-        email: form.email.trim(),
         temporary_password: form.temporary_password,
         role: form.role,
       });
@@ -403,31 +417,38 @@ function AdminDashboard({ name, staff, onStaffAdded }) {
         </div>
 
         <form className="visit-form" onSubmit={handleSubmit}>
-          <div className="visit-form-row">
-            <label className="field">
-              <span className="field-label">Full name</span>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(event) => updateField("name", event.target.value)}
-                autoComplete="off"
-                required
-                disabled={isSubmitting}
-              />
-            </label>
+          <label className="field">
+            <span className="field-label">Full name</span>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(event) => updateField("name", event.target.value)}
+              autoComplete="off"
+              required
+              disabled={isSubmitting}
+            />
+          </label>
 
-            <label className="field">
-              <span className="field-label">Email</span>
-              <input
-                type="email"
-                value={form.email}
-                onChange={(event) => updateField("email", event.target.value)}
-                autoComplete="off"
-                required
-                disabled={isSubmitting}
-              />
-            </label>
-          </div>
+          <label className="field">
+            <span className="field-label">
+              Login email <span className="field-hint">generated from the name</span>
+            </span>
+            <input
+              type="text"
+              value={
+                derivedEmail ||
+                (domain ? `first.last@${domain}` : "")
+              }
+              placeholder={
+                domain
+                  ? `first.last@${domain}`
+                  : "your hospital has no email domain set"
+              }
+              readOnly
+              tabIndex={-1}
+              aria-readonly="true"
+            />
+          </label>
 
           <div className="visit-form-row">
             <label className="field">

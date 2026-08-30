@@ -161,43 +161,63 @@ def run(client: httpx.Client) -> None:
           health.get("db") == "ok" and health.get("model") == "ok", str(health))
 
     # -- register hospital -> admin, then admin provisions the staff ---------
+    # The domain is chosen here; the admin's own login address is derived from
+    # the name + domain (never sent), as every staff address then is.
+    domain = f"{TAG}.smoke.test"
     response = client.post(f"{BASE}/auth/register-hospital", json={
         "hospital_name": f"{PREFIX} E2E {TAG}", "address": "temp",
         "pincode": "560017", "city": "Bengaluru",
-        "admin_name": "Admin", "admin_email": f"admin.{TAG}@smoke.test",
+        "admin_name": "Anita Rao", "email_domain": domain,
         "password": "smoketest123"})
     response.raise_for_status()
-    admin = {"Authorization": f"Bearer {response.json()['token']}"}
+    reg = response.json()
+    admin = {"Authorization": f"Bearer {reg['token']}"}
+    check("admin login address is name-derived on the chosen domain",
+          reg["user"]["email"] == f"anita.rao@{domain}", reg["user"]["email"])
+
+    hospital_now = client.get(f"{BASE}/hospital", headers=admin).json()
+    check("hospital carries its email domain",
+          hospital_now.get("email_domain") == domain, str(hospital_now.get("email_domain")))
 
     # fault #7: same name + same pincode is a duplicate; same name + a different
     # pincode is a branch and is allowed.
     dupe = client.post(f"{BASE}/auth/register-hospital", json={
         "hospital_name": f"{PREFIX} E2E {TAG}", "address": "temp",
-        "pincode": "560017", "admin_name": "Admin2",
-        "admin_email": f"admin2.{TAG}@smoke.test", "password": "smoketest123"})
+        "pincode": "560017", "admin_name": "Bala Nair",
+        "email_domain": domain, "password": "smoketest123"})
     check("fault #7: same hospital name + same pincode -> 409",
           dupe.status_code == 409, str(dupe.status_code))
     branch = client.post(f"{BASE}/auth/register-hospital", json={
         "hospital_name": f"{PREFIX} E2E {TAG}", "address": "temp",
-        "pincode": "560066", "admin_name": "Branch Admin",
-        "admin_email": f"branch.{TAG}@smoke.test", "password": "smoketest123"})
+        "pincode": "560066", "admin_name": "Chandra Bose",
+        "email_domain": domain, "password": "smoketest123"})
     check("fault #7: same name + different pincode -> branch allowed",
           branch.status_code == 200, str(branch.status_code))
 
     # fault #6: a digits-only name is rejected.
     bad_name = client.post(f"{BASE}/auth/register-hospital", json={
         "hospital_name": "123456", "pincode": "560099", "admin_name": "X Y",
-        "admin_email": f"badname.{TAG}@smoke.test", "password": "smoketest123"})
+        "email_domain": domain, "password": "smoketest123"})
     check("fault #6: digits-only hospital name -> 422",
           bad_name.status_code == 422, str(bad_name.status_code))
 
+    # a malformed email domain is rejected.
+    bad_domain = client.post(f"{BASE}/auth/register-hospital", json={
+        "hospital_name": f"{PREFIX} BadDomain {TAG}", "pincode": "560098",
+        "admin_name": "Dee Dee", "email_domain": "not a domain",
+        "password": "smoketest123"})
+    check("malformed email domain -> 422", bad_domain.status_code == 422,
+          str(bad_domain.status_code))
+
     staff = {}
     for role in ("clinician", "receptionist"):
-        email = f"{role}.{TAG}@smoke.test"
         created = client.post(f"{BASE}/staff", headers=admin, json={
-            "name": role.title(), "email": email, "role": role,
+            "name": role.title(), "role": role,
             "temporary_password": "temp-pass-123"})
         created.raise_for_status()
+        email = created.json()["email"]
+        check(f"{role} email derived from the name on the hospital domain",
+              email == f"{role}@{domain}", email)
         check(f"provisioned {role} must set a password on first sign-in",
               created.json()["must_change_password"] is True)
 
@@ -216,6 +236,18 @@ def run(client: httpx.Client) -> None:
               changed.json()["user"]["must_change_password"] is False)
         staff[role] = {"Authorization": f"Bearer {changed.json()['token']}"}
     check("hospital + clinician + receptionist provisioned", len(staff) == 2)
+
+    # two staff with the same name get progressively shortened addresses.
+    dup1 = client.post(f"{BASE}/staff", headers=admin, json={
+        "name": "Meera Iyer", "role": "clinician",
+        "temporary_password": "temp-pass-123"}).json()
+    dup2 = client.post(f"{BASE}/staff", headers=admin, json={
+        "name": "Meera Iyer", "role": "receptionist",
+        "temporary_password": "temp-pass-123"}).json()
+    check("same-name staff get distinct, shortened derived emails",
+          dup1["email"] == f"meera.iyer@{domain}"
+          and dup2["email"] == f"meera.i@{domain}",
+          f"{dup1['email']} / {dup2['email']}")
 
     doctor, desk = staff["clinician"], staff["receptionist"]
 
@@ -376,8 +408,8 @@ def run(client: httpx.Client) -> None:
     # -- Rule 12: a second hospital cannot see the first one's patient -----
     response = client.post(f"{BASE}/auth/register-hospital", json={
         "hospital_name": f"{PREFIX} Other {TAG}", "address": "temp",
-        "pincode": "110001", "admin_name": "Other",
-        "admin_email": f"other.{TAG}@smoke.test", "password": "smoketest123"})
+        "pincode": "110001", "admin_name": "Otto Klein",
+        "email_domain": f"other-{TAG}.smoke.test", "password": "smoketest123"})
     response.raise_for_status()
     outsider = {"Authorization": f"Bearer {response.json()['token']}"}
 

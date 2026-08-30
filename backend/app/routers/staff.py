@@ -17,10 +17,11 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.deps import CurrentUser, require_hospital_admin
-from app.models import User
+from app.models import Hospital, User
 from app.schemas import ResetPasswordRequest, StaffCreate, StaffListItem
 from app.security import hash_password
 from app.services.audit import record_audit
+from app.services.emails import allocate_email
 
 router = APIRouter(prefix="/staff", tags=["staff"])
 
@@ -45,11 +46,22 @@ def add_staff(
     db: Session = Depends(get_db),
     admin: CurrentUser = Depends(require_hospital_admin),
 ) -> User:
-    """Provision a clinician or receptionist with a temporary password."""
+    """Provision a clinician or receptionist with a temporary password.
+
+    The login address is derived from the name + the hospital's email domain
+    (fixed at registration), so the admin never types an email.
+    """
+    hospital = db.get(Hospital, admin.hospital_id)
+    if hospital is None or not hospital.email_domain:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Your hospital has no email domain set — cannot create accounts.",
+        )
+
     user = User(
         hospital_id=admin.hospital_id,
         name=body.name,
-        email=body.email,
+        email=allocate_email(db, name=body.name, domain=hospital.email_domain),
         password_hash=hash_password(body.temporary_password),
         role=body.role,  # schema restricts to receptionist/clinician
         must_change_password=True,

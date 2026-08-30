@@ -138,9 +138,11 @@ export const api = {
 
   // --- staff management, hospital_admin only (§5) ------------------------
   // The admin's dashboard: the clinicians and receptionists at their own
-  // hospital. addStaff provisions the account in the caller's hospital (never
-  // one named in the body) with a temporary password; the new user is forced to
-  // change it on first sign-in.
+  // hospital. addStaff takes { name, temporary_password, role } — the login
+  // email is derived server-side from the name + the hospital's fixed email
+  // domain, never sent. The account lands in the caller's hospital (never one
+  // named in the body) and the new user must change the password on first
+  // sign-in.
   listStaff: () => request("/staff"),
   addStaff: (body) => request("/staff", { method: "POST", body }),
   resetStaffPassword: (id, body) =>

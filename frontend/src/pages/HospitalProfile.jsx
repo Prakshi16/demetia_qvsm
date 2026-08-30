@@ -2,9 +2,10 @@
  * Hospital profile (fault #4).
  *
  * Every signed-in user sees their hospital's identity (name, city, pincode,
- * address, logo) and a link to change their own password. A hospital_admin also
- * gets an inline edit form and a logo upload. Staff management lives on the
- * admin's dashboard, not here.
+ * address, logo, staff email domain) and a link to change their own password. A
+ * hospital_admin also gets an inline edit form and a logo upload — but not for
+ * the email domain, which is fixed at registration. Staff management lives on
+ * the admin's dashboard, not here.
  */
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -245,6 +246,10 @@ function IdentityCard({ hospital, isAdmin, onChange }) {
           <div>
             <dt>Pincode</dt>
             <dd>{hospital.pincode || "—"}</dd>
+          </div>
+          <div>
+            <dt>Staff email domain</dt>
+            <dd>{hospital.email_domain ? `@${hospital.email_domain}` : "—"}</dd>
           </div>
           <div>
             <dt>Address</dt>

@@ -53,3 +53,34 @@ export function validatePassword(value) {
     ? null
     : `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
 }
+
+// Mirror of clean_email_domain in app/services/emails.py — a typo gate, not an
+// RFC check. Tolerates a pasted "@domain" or a full address.
+const DOMAIN_RE = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+
+export function normaliseEmailDomain(value) {
+  let cleaned = (value ?? "").trim().toLowerCase();
+  if (cleaned.includes("://")) cleaned = cleaned.split("://")[1];
+  cleaned = cleaned.split("/")[0].replace(/^@+/, "");
+  if (cleaned.includes("@")) cleaned = cleaned.split("@")[1];
+  return cleaned;
+}
+
+export function validateEmailDomain(value) {
+  const cleaned = normaliseEmailDomain(value);
+  return cleaned.length <= 253 && DOMAIN_RE.test(cleaned)
+    ? null
+    : "Enter a valid email domain, e.g. yourhospital.com";
+}
+
+// Mirror of local_part_from_name in app/services/emails.py: first two name
+// tokens, letters only, dot-joined. Used to preview the login address a name
+// will produce ("" until there is something to show).
+export function slugLocalPart(name) {
+  const tokens = (name ?? "")
+    .split(/\s+/)
+    .map((token) => token.toLowerCase().replace(/[^a-z]/g, ""))
+    .filter(Boolean)
+    .slice(0, 2);
+  return tokens.join(".");
+}

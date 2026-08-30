@@ -9,12 +9,19 @@
  * Pincode is required and is what tells branches of the same chain apart
  * (fault #7): "Manipal Hospital" at 560017 and at 560066 are two hospitals;
  * "Manipal Hospital" registered twice at 560017 is rejected.
+ *
+ * The admin picks the hospital's email domain here. It is fixed for the life of
+ * the hospital, and every login address — the admin's own included — is derived
+ * from the person's name plus that domain, so no email is ever typed.
  */
 import { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/useAuth";
 import {
+  normaliseEmailDomain,
+  slugLocalPart,
+  validateEmailDomain,
   validateOrgName,
   validatePassword,
   validatePersonName,
@@ -30,8 +37,12 @@ export default function SignUp() {
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [emailDomain, setEmailDomain] = useState("");
   const [password, setPassword] = useState("");
+
+  const domain = normaliseEmailDomain(emailDomain);
+  const localPart = slugLocalPart(name);
+  const derivedEmail = localPart && domain ? `${localPart}@${domain}` : "";
 
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,6 +57,7 @@ export default function SignUp() {
       validateOrgName(hospitalName) ||
       validatePincode(pincode) ||
       validatePersonName(name) ||
+      validateEmailDomain(emailDomain) ||
       validatePassword(password);
     if (firstError) return setError(firstError);
 
@@ -57,7 +69,7 @@ export default function SignUp() {
         city: city.trim() || null,
         address: address.trim() || null,
         admin_name: name.trim(),
-        admin_email: email.trim(),
+        email_domain: domain,
         password,
       });
       navigate("/", { replace: true });
@@ -138,16 +150,27 @@ export default function SignUp() {
           </label>
 
           <label className="field">
-            <span className="field-label">Email</span>
+            <span className="field-label">
+              Staff email domain{" "}
+              <span className="field-hint">e.g. yourhospital.com</span>
+            </span>
             <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
+              value={emailDomain}
+              onChange={(event) => setEmailDomain(event.target.value)}
+              placeholder="yourhospital.com"
+              autoComplete="off"
               required
               disabled={isSubmitting}
             />
           </label>
+
+          <p className="field-hint">
+            Every account here uses this domain, and login addresses come from the
+            person&rsquo;s name — nothing to type per staff member. Your login
+            email will be{" "}
+            <strong>{derivedEmail || "your.name@yourhospital.com"}</strong>. This
+            domain can&rsquo;t be changed later.
+          </p>
 
           <label className="field">
             <span className="field-label">Password</span>

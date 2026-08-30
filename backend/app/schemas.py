@@ -14,6 +14,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
+from app.services.emails import clean_email_domain
+
 # Literals mirror the Postgres ENUM value sets in models.py / 001_init.sql.
 StaffRole = Literal["receptionist", "clinician"]
 ConsentGivenBy = Literal["patient", "guardian"]
@@ -85,12 +87,16 @@ class RegisterHospitalRequest(BaseModel):
     pincode: str
     city: Optional[str] = None
     admin_name: str
-    admin_email: str
+    # The domain every account at this hospital will use. The admin's own login
+    # address is derived from admin_name + this domain (never typed) — see
+    # services/emails.py — so there is no admin_email field.
+    email_domain: str
     password: str
 
     _v_name = field_validator("hospital_name")(clean_org_name)
     _v_admin = field_validator("admin_name")(clean_person_name)
     _v_pin = field_validator("pincode")(clean_pincode)
+    _v_domain = field_validator("email_domain")(clean_email_domain)
     _v_pw = field_validator("password")(validate_password)
 
 
@@ -107,12 +113,14 @@ class LoginRequest(BaseModel):
 # --------------------------------------------------------------------------- #
 class StaffCreate(BaseModel):
     name: str
-    email: str
     temporary_password: str
     role: StaffRole  # receptionist | clinician — an admin cannot mint another admin
 
     _v_name = field_validator("name")(clean_person_name)
     _v_pw = field_validator("temporary_password")(validate_password)
+    # No email field: the login address is derived from `name` + the hospital's
+    # email_domain (services/emails.allocate_email), so the whole roster is
+    # consistent and the admin has nothing to mistype.
 
 
 class StaffListItem(BaseModel):
@@ -178,6 +186,7 @@ class HospitalDetailOut(BaseModel):
     city: Optional[str] = None
     pincode: Optional[str] = None
     logo_url: Optional[str] = None
+    email_domain: Optional[str] = None  # immutable; shown, never edited
     created_at: datetime
 
 

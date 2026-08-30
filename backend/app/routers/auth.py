@@ -2,12 +2,17 @@
 
 ``register-hospital`` and ``login`` return a JWT so the client is logged in
 immediately. Staff accounts are no longer self-service — a ``hospital_admin``
-provisions them via ``POST /users`` (see routers/users.py) and the new staff
+provisions them via ``POST /staff`` (see routers/staff.py) and the new staff
 member is forced through ``POST /auth/change-password`` on first sign-in.
+
+Login addresses are never typed: ``register-hospital`` takes an ``email_domain``
+and the admin's own address is derived from their name (services/emails.py), as
+every staff address then is.
 """
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -23,6 +28,7 @@ from app.schemas import (
     UserOut,
 )
 from app.security import create_access_token, hash_password, verify_password
+from app.services.emails import allocate_email
 from app.services.hospitals import assert_hospital_name_available
 
 router = APIRouter(tags=["auth"])
@@ -60,14 +66,17 @@ def register_hospital(
         address=body.address,
         pincode=body.pincode,
         city=body.city,
+        email_domain=body.email_domain,
     )
     db.add(hospital)
     db.flush()  # assign hospital.id before creating the admin user
 
+    # The admin's login address is derived from their name + the chosen domain,
+    # exactly like every staff account will be (services/emails.py).
     admin = User(
         hospital_id=hospital.id,
         name=body.admin_name,
-        email=body.admin_email,
+        email=allocate_email(db, name=body.admin_name, domain=body.email_domain),
         password_hash=hash_password(body.password),
         role="hospital_admin",
         must_change_password=False,
@@ -88,7 +97,10 @@ def register_hospital(
 @router.post("/auth/login", response_model=TokenResponse)
 def login(body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     """Email + password. Role is read from the record, never chosen at sign-in."""
-    user = db.query(User).filter(User.email == body.email).first()
+    # Stored addresses are lowercase (services/emails.py); match case-insensitively
+    # so a capitalised sign-in still works.
+    email = (body.email or "").strip().lower()
+    user = db.query(User).filter(func.lower(User.email) == email).first()
     if user is None or not verify_password(body.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

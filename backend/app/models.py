@@ -61,6 +61,10 @@ class Hospital(Base):
     pincode: Mapped[str | None] = mapped_column(Text, nullable=True)
     city: Mapped[str | None] = mapped_column(Text, nullable=True)
     logo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The one email domain every account at this hospital uses (migration 004).
+    # Set once at register-hospital and never editable — a company has one domain.
+    # Nullable only for rows that predate the column; the app always supplies it.
+    email_domain: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
