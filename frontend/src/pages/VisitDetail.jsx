@@ -18,11 +18,14 @@
  *
  * Back target is fixed to the Patient Profile per §6, not browser history.
  */
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { api } from "../api/client";
 import { useAuth } from "../auth/useAuth";
+
+// ~1-2 MB of WebGL viewer — only pulled when a clinician actually opens a scan.
+const ScanViewer = lazy(() => import("../components/ScanViewer"));
 
 const DIAGNOSIS_OPTIONS = [
   "Nondemented",
@@ -77,6 +80,14 @@ export default function VisitDetail() {
   const [saveError, setSaveError] = useState("");
   const [savedAt, setSavedAt] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Uploaded files: signed URLs fetched on demand (they expire in ~1h).
+  const [speechFile, setSpeechFile] = useState(null);
+  const [speechFileError, setSpeechFileError] = useState("");
+  const [mriFile, setMriFile] = useState(null);
+  const [mriFileError, setMriFileError] = useState("");
+  const [mriLoading, setMriLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,6 +104,17 @@ export default function VisitDetail() {
         // payload carries only patient_id.
         const loadedPatient = await api.getPatient(loadedVisit.patient_id);
         if (!cancelled) setPatient(loadedPatient);
+
+        // The speech player needs a URL up front; the MRI viewer is opened on
+        // demand, so its URL is fetched from the button instead.
+        if (loadedVisit.speech_status === "done") {
+          try {
+            const file = await api.getVisitFile(visitId, "speech");
+            if (!cancelled) setSpeechFile(file);
+          } catch (error) {
+            if (!cancelled) setSpeechFileError(error.message);
+          }
+        }
       } catch (error) {
         if (!cancelled) setLoadError(error.message);
       } finally {
@@ -106,6 +128,32 @@ export default function VisitDetail() {
     };
   }, [visitId]);
 
+  async function openMri() {
+    setMriFileError("");
+    if (mriFile) {
+      setMriFile(null); // toggle the viewer closed
+      return;
+    }
+    setMriLoading(true);
+    try {
+      const file = await api.getVisitFile(visitId, "mri");
+      setMriFile(file);
+    } catch (error) {
+      setMriFileError(error.message);
+    } finally {
+      setMriLoading(false);
+    }
+  }
+
+  async function retrySpeechFile() {
+    setSpeechFileError("");
+    try {
+      setSpeechFile(await api.getVisitFile(visitId, "speech"));
+    } catch (error) {
+      setSpeechFileError(error.message);
+    }
+  }
+
   async function handleSaveDiagnosis(event) {
     event.preventDefault();
     setSaveError("");
@@ -117,6 +165,10 @@ export default function VisitDetail() {
       });
       setVisit(updated);
       setSavedAt(new Date());
+      // Collapse the revise form back to saved values + "Edit diagnosis".
+      setIsEditing(false);
+      setDiagnosis(updated.doctor_diagnosis ?? "");
+      setNotes(updated.doctor_notes ?? "");
     } catch (error) {
       setSaveError(error.message);
     } finally {
@@ -149,6 +201,7 @@ export default function VisitDetail() {
 
   const isScreening = visit.visit_type === "screening";
   const isClinician = user.role === "clinician";
+  const isReceptionist = user.role === "receptionist";
   const history = visit.diagnosis_history ?? [];
 
   // Rule 5: first save, or a revision on the same UTC day as the last one.
@@ -160,6 +213,20 @@ export default function VisitDetail() {
     isClinician &&
     (visit.status === "pending_review" ||
       (visit.status === "reviewed" && isSameUtcDayAsLastSave));
+
+  // The first diagnosis gets an always-visible form. A same-day revision hides
+  // it behind an "Edit diagnosis" button so the doctor doesn't re-save on
+  // autopilot; a later day is read-only (handled by canDiagnose above).
+  const isFirstSave = canDiagnose && visit.status === "pending_review";
+  const isRevision =
+    canDiagnose && visit.status === "reviewed" && Boolean(visit.doctor_diagnosis);
+  const showForm = isFirstSave || (isRevision && isEditing);
+
+  const normalizedNotes = notes.trim() === "" ? null : notes.trim();
+  const isUnchanged =
+    isRevision &&
+    diagnosis === (visit.doctor_diagnosis ?? "") &&
+    normalizedNotes === (visit.doctor_notes ?? null);
 
   return (
     <div className="page visit-page visit-detail">
@@ -230,20 +297,94 @@ export default function VisitDetail() {
           <dl className="detail-grid">
             <div>
               <dt>MRI scan</dt>
-              <dd>{MODALITY_LABELS[visit.mri_status] ?? visit.mri_status}</dd>
+              <dd>
+                {MODALITY_LABELS[visit.mri_status] ?? visit.mri_status}
+                {visit.mri_status === "done" ? (
+                  <div className="modality-actions no-print">
+                    <button
+                      type="button"
+                      className="button-quiet"
+                      onClick={openMri}
+                      disabled={mriLoading}
+                    >
+                      {mriLoading
+                        ? "Opening…"
+                        : mriFile
+                          ? "Hide scan"
+                          : "View scan"}
+                    </button>
+                    {mriFile ? (
+                      <a
+                        className="button-quiet"
+                        href={mriFile.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Download
+                      </a>
+                    ) : null}
+                  </div>
+                ) : null}
+                {mriFileError ? (
+                  <p className="visit-note no-print">
+                    {mriFileError}{" "}
+                    <button type="button" className="link-button" onClick={openMri}>
+                      Try again
+                    </button>
+                  </p>
+                ) : null}
+              </dd>
             </div>
             <div>
               <dt>Speech recording</dt>
-              <dd>{MODALITY_LABELS[visit.speech_status] ?? visit.speech_status}</dd>
+              <dd>
+                {MODALITY_LABELS[visit.speech_status] ?? visit.speech_status}
+                {visit.speech_status === "done" ? (
+                  speechFile ? (
+                    <audio
+                      className="visit-audio no-print"
+                      controls
+                      src={speechFile.url}
+                    />
+                  ) : speechFileError ? (
+                    <p className="visit-note no-print">
+                      Couldn’t load the recording (the link may have expired).{" "}
+                      <button
+                        type="button"
+                        className="link-button"
+                        onClick={retrySpeechFile}
+                      >
+                        Try again
+                      </button>
+                    </p>
+                  ) : (
+                    <p className="visit-note no-print">Loading player…</p>
+                  )
+                ) : null}
+              </dd>
             </div>
           </dl>
+
+          {mriFile ? (
+            <Suspense
+              fallback={<p className="visit-note no-print">Loading viewer…</p>}
+            >
+              <ScanViewer url={mriFile.url} filename={mriFile.filename} />
+            </Suspense>
+          ) : null}
+
           {visit.status === "awaiting_uploads" ? (
             <p className="visit-note no-print">
-              This visit is still incomplete — the model runs once both are in.{" "}
-              <Link to={`/patients/${visit.patient_id}/new-visit/screening?visitId=${visit.id}`}>
-                Finish the uploads
-              </Link>
-              .
+              This visit is still incomplete — the model runs once both are in.
+              {isReceptionist ? (
+                <>
+                  {" "}
+                  <Link to={`/patients/${visit.patient_id}/new-visit/screening?visitId=${visit.id}`}>
+                    Finish the uploads
+                  </Link>
+                  .
+                </>
+              ) : null}
             </p>
           ) : null}
         </section>
@@ -314,7 +455,7 @@ export default function VisitDetail() {
             </dl>
           ) : null}
 
-          {canDiagnose ? (
+          {showForm ? (
             <form className="visit-form no-print" onSubmit={handleSaveDiagnosis}>
               <label className="field">
                 <span className="field-label">
@@ -355,10 +496,37 @@ export default function VisitDetail() {
                 </p>
               ) : null}
 
-              {/* §6: explicit save, nothing auto-saves. */}
-              <button type="submit" className="button-primary" disabled={isSaving}>
-                {isSaving ? "Saving…" : "Save diagnosis"}
-              </button>
+              <div className="visit-form-actions">
+                {/* §6: explicit save, nothing auto-saves. */}
+                <button
+                  type="submit"
+                  className="button-primary"
+                  disabled={isSaving || isUnchanged}
+                >
+                  {isSaving ? "Saving…" : "Save diagnosis"}
+                </button>
+                {isEditing ? (
+                  <button
+                    type="button"
+                    className="button-quiet"
+                    disabled={isSaving}
+                    onClick={() => {
+                      setDiagnosis(visit.doctor_diagnosis ?? "");
+                      setNotes(visit.doctor_notes ?? "");
+                      setSaveError("");
+                      setIsEditing(false);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                ) : null}
+              </div>
+
+              {isUnchanged ? (
+                <span className="field-hint">
+                  Change the diagnosis or notes to save a revision.
+                </span>
+              ) : null}
 
               {savedAt ? (
                 <p className="visit-note" role="status">
@@ -367,6 +535,26 @@ export default function VisitDetail() {
                 </p>
               ) : null}
             </form>
+          ) : isRevision ? (
+            <div className="no-print">
+              <button
+                type="button"
+                className="button-primary"
+                onClick={() => {
+                  setDiagnosis(visit.doctor_diagnosis ?? "");
+                  setNotes(visit.doctor_notes ?? "");
+                  setSaveError("");
+                  setSavedAt(null);
+                  setIsEditing(true);
+                }}
+              >
+                Edit diagnosis
+              </button>
+              <p className="visit-note">
+                This diagnosis can still be revised today; after that, a change
+                goes through a new follow-up visit.
+              </p>
+            </div>
           ) : (
             <p className="visit-note">
               {!isClinician

@@ -347,6 +347,19 @@ class VisitDetailOut(BaseModel):
     diagnosis_history: list[DiagnosisHistoryOut] = []
 
 
+class VisitFileOut(BaseModel):
+    """A short-lived signed URL for one of a visit's raw uploads.
+
+    ``url`` points straight at Supabase Storage and expires after
+    ``expires_in`` seconds — the client refetches on demand.
+    """
+
+    url: str
+    filename: str
+    content_type: str
+    expires_in: int = 3600
+
+
 class DiagnosisCreate(BaseModel):
     doctor_diagnosis: DoctorDiagnosis
     doctor_notes: Optional[str] = None

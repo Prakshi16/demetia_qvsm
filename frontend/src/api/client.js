@@ -190,6 +190,11 @@ export const api = {
   // 400 here is the rule working, not a bug to route around.
   saveDiagnosis: (visitId, body) =>
     request(`/visits/${visitId}/diagnosis`, { method: "POST", body }),
+
+  // A short-lived signed URL for a visit's raw upload: kind is "mri" or
+  // "speech". Returns { url, filename, content_type, expires_in }. The url
+  // points straight at Supabase and expires in ~1h, so fetch it on demand.
+  getVisitFile: (visitId, kind) => request(`/visits/${visitId}/file/${kind}`),
 };
 
 /**

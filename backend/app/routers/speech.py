@@ -173,6 +173,7 @@ async def upload_speech(
     # Save to database
     # ------------------------------------------------------------------
     visit.speech_feature_vector = features
+    visit.speech_object_path = storage_path
     visit.speech_status = "done"
 
     # ------------------------------------------------------------------

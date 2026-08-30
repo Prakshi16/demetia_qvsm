@@ -163,6 +163,11 @@ class Visit(Base):
     )
     mri_feature_vector: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     speech_feature_vector: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    # Object keys in the private SUPABASE_BUCKET for the raw uploads (migration
+    # 005). Set by the upload endpoints; read by GET /visits/{id}/file/{kind} to
+    # sign a short-lived URL. Nullable for rows that predate the column.
+    mri_object_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    speech_object_path: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # --- model output (screening only, filled once all 3 modalities are done) ---
     # model_prediction / model_confidence hold the QSVM ("Quantum SVM") result —

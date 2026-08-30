@@ -139,6 +139,7 @@ async def upload_mri(
         ) from exc
 
     visit.mri_feature_vector = features
+    visit.mri_object_path = storage_path
     visit.mri_status = "done"
 
     check_and_run_prediction(db, visit)

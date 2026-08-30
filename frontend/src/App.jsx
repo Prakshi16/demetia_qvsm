@@ -50,8 +50,18 @@ export default function App() {
         <Route path="/hospital" element={<HospitalProfile />} />
 
         {/* §6 screen 3. A static segment, so React Router ranks it above
-            Govind's /patients/:patientId and it won't be swallowed by it. */}
-        <Route path="/patients/new" element={<RegisterPatient />} />
+            Govind's /patients/:patientId and it won't be swallowed by it.
+            Patient intake and starting visits are front-desk work — a clinician
+            who lands here (or on either new-visit route) is bounced home. The
+            server enforces the same with require_receptionist. */}
+        <Route
+          path="/patients/new"
+          element={
+            <ProtectedRoute roles={["receptionist"]}>
+              <RegisterPatient />
+            </ProtectedRoute>
+          }
+        />
 
         {/* §6 screens 5 and 6. Deliberately NOT /patients/:patientId or
             /visits/:visitId — those two paths are reserved for Govind's
@@ -59,11 +69,19 @@ export default function App() {
             ?visitId=... resumes an awaiting_uploads visit (Product Rule 2A). */}
         <Route
           path="/patients/:patientId/new-visit/screening"
-          element={<NewVisitScreening />}
+          element={
+            <ProtectedRoute roles={["receptionist"]}>
+              <NewVisitScreening />
+            </ProtectedRoute>
+          }
         />
         <Route
           path="/patients/:patientId/new-visit/follow-up"
-          element={<NewVisitFollowUp />}
+          element={
+            <ProtectedRoute roles={["receptionist"]}>
+              <NewVisitFollowUp />
+            </ProtectedRoute>
+          }
         />
 
         {/* §6 screens 4 and 7. These two paths are what every other screen's

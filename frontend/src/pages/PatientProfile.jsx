@@ -18,6 +18,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { api } from "../api/client";
 import TrendChart from "../components/TrendChart";
+import { useAuth } from "../auth/useAuth";
 
 const VISIT_TYPE_LABELS = {
   screening: "Screening",
@@ -54,6 +55,9 @@ function formatAge(dob) {
 export default function PatientProfile() {
   const { patientId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // Starting a visit is a front-desk action; a clinician only reviews.
+  const isReceptionist = user.role === "receptionist";
 
   const [patient, setPatient] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -142,30 +146,34 @@ export default function PatientProfile() {
         </p>
       </header>
 
-      <div className="profile-actions">
-        <button
-          type="button"
-          className="button-primary"
-          onClick={() => startVisit(false)}
-          disabled={isRouting}
-        >
-          {isRouting ? "Checking…" : "+ New visit"}
-        </button>
-        {/* §4: offered regardless of what the decision logic returned. */}
-        <button
-          type="button"
-          className="button-quiet"
-          onClick={() => startVisit(true)}
-          disabled={isRouting}
-        >
-          Start full screening instead
-        </button>
-      </div>
+      {isReceptionist ? (
+        <>
+          <div className="profile-actions">
+            <button
+              type="button"
+              className="button-primary"
+              onClick={() => startVisit(false)}
+              disabled={isRouting}
+            >
+              {isRouting ? "Checking…" : "+ New visit"}
+            </button>
+            {/* §4: offered regardless of what the decision logic returned. */}
+            <button
+              type="button"
+              className="button-quiet"
+              onClick={() => startVisit(true)}
+              disabled={isRouting}
+            >
+              Start full screening instead
+            </button>
+          </div>
 
-      {routeError ? (
-        <p className="form-error" role="alert">
-          {routeError}
-        </p>
+          {routeError ? (
+            <p className="form-error" role="alert">
+              {routeError}
+            </p>
+          ) : null}
+        </>
       ) : null}
 
       <section className="visit-card">
@@ -223,7 +231,9 @@ export default function PatientProfile() {
 
         {visits.length === 0 ? (
           <p className="list-note">
-            No visits yet. “+ New visit” starts the first screening.
+            {isReceptionist
+              ? "No visits yet. “+ New visit” starts the first screening."
+              : "No visits yet."}
           </p>
         ) : (
           <ol className="visit-history">

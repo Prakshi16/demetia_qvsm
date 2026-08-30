@@ -251,6 +251,19 @@ def run(client: httpx.Client) -> None:
 
     doctor, desk = staff["clinician"], staff["receptionist"]
 
+    # -- receptionist-only: patient intake and starting visits belong to the
+    #    front desk; a clinician or admin calling them gets 403 --------------
+    for label, hdr in (("clinician", doctor), ("admin", admin)):
+        r = client.post(f"{BASE}/patients", headers=hdr, json={
+            "name": f"{PREFIX} Nope {TAG}", "consent_given_by": "patient"})
+        check(f"{label} cannot register a patient -> 403",
+              r.status_code == 403, str(r.status_code))
+        r = client.post(f"{BASE}/visits", headers=hdr, json={
+            "patient_id": str(uuid.uuid4()), "visit_type": "screening",
+            "mmse": 24, "cdr": 0.5, "edu": 12, "ses": 3})
+        check(f"{label} cannot open a visit -> 403",
+              r.status_code == 403, str(r.status_code))
+
     # -- Rule 7: consent ---------------------------------------------------
     response = client.post(f"{BASE}/patients", headers=desk, json={
         "name": f"{PREFIX} NoRelationship {TAG}", "consent_given_by": "guardian"})
@@ -263,6 +276,10 @@ def run(client: httpx.Client) -> None:
     response.raise_for_status()
     patient_id = response.json()["id"]
     check("patient registered with consent", True)
+
+    r = client.get(f"{BASE}/patients/{patient_id}/next-visit-type", headers=doctor)
+    check("clinician cannot query next-visit-type -> 403",
+          r.status_code == 403, str(r.status_code))
 
     # -- §4: a patient with no history gets a screening --------------------
     decision = client.get(f"{BASE}/patients/{patient_id}/next-visit-type",
@@ -338,6 +355,13 @@ def run(client: httpx.Client) -> None:
     check("prediction is persisted, not just echoed",
           persisted["model_prediction"] == model_says)
 
+    # -- the clinician can pull the raw scan / recording back -------------
+    for kind in ("mri", "speech"):
+        r = client.get(f"{BASE}/visits/{visit_id}/file/{kind}", headers=doctor)
+        check(f"clinician gets a signed URL for the {kind} upload",
+              r.status_code == 200 and bool(r.json().get("url")),
+              f"{r.status_code} {r.text[:120]}")
+
     queue = client.get(f"{BASE}/patients/pending-review", headers=doctor).json()
     check("patient reaches the clinician's pending-review queue",
           any(p["id"] == patient_id for p in queue), f"{len(queue)} in queue")
@@ -369,6 +393,19 @@ def run(client: httpx.Client) -> None:
               response.json()["agreement_flag"] != "mismatch",
               str(response.json()["agreement_flag"]))
 
+        # Re-posting the identical diagnosis is a no-op — refused, and no
+        # history row written for it.
+        again = client.post(f"{BASE}/visits/{visit_id}/diagnosis", headers=doctor,
+                            json={"doctor_diagnosis": model_says,
+                                  "doctor_notes": "revised same day"})
+        check("identical diagnosis re-save -> 400 'No changes'",
+              again.status_code == 400 and "No changes" in again.text,
+              f"{again.status_code} {again.text[:120]}")
+        hist = client.get(f"{BASE}/visits/{visit_id}", headers=doctor).json()
+        check("the rejected no-op wrote no history row",
+              len(hist.get("diagnosis_history") or []) == 2,
+              str(len(hist.get("diagnosis_history") or [])))
+
     # -- follow-up ---------------------------------------------------------
     decision = client.get(f"{BASE}/patients/{patient_id}/next-visit-type",
                           headers=desk).json()
@@ -386,6 +423,10 @@ def run(client: httpx.Client) -> None:
           follow_up["model_prediction"] is None
           and follow_up["mri_status"] == "not_applicable"
           and follow_up["speech_status"] == "not_applicable")
+
+    r = client.get(f"{BASE}/visits/{follow_up['id']}/file/mri", headers=desk)
+    check("a follow-up has no MRI file -> 404", r.status_code == 404,
+          str(r.status_code))
 
     profile = client.get(f"{BASE}/patients/{patient_id}", headers=desk).json()
     check("trend chart gains a second point", len(profile["trend"]) == 2,
@@ -418,6 +459,9 @@ def run(client: httpx.Client) -> None:
           response.status_code == 404, str(response.status_code))
     response = client.get(f"{BASE}/visits/{visit_id}", headers=outsider)
     check("Rule 12: another hospital's visit -> 404, never 403",
+          response.status_code == 404, str(response.status_code))
+    response = client.get(f"{BASE}/visits/{visit_id}/file/mri", headers=outsider)
+    check("Rule 12: another hospital's visit file -> 404, never 403",
           response.status_code == 404, str(response.status_code))
 
 

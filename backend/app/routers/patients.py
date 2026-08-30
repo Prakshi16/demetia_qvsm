@@ -158,9 +158,12 @@ def incomplete_visits(
 def create_patient(
     body: PatientCreate,
     db: Session = Depends(get_db),
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(require_receptionist),
 ) -> PatientProfileOut:
-    """Register a patient (consent captured once here — Rule 7). No visit created."""
+    """Register a patient (consent captured once here — Rule 7). No visit created.
+
+    Receptionist-only: patient intake is a front-desk task.
+    """
     patient = Patient(
         hospital_id=user.hospital_id,
         name=body.name,
@@ -251,9 +254,12 @@ def next_visit_type(
     patient_id: uuid.UUID,
     force_screening: bool = Query(default=False),
     db: Session = Depends(get_db),
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(require_receptionist),
 ) -> NextVisitTypeOut:
-    """§4 decision: screening vs follow-up for this patient's next visit."""
+    """§4 decision: screening vs follow-up for this patient's next visit.
+
+    Receptionist-only: it only feeds the front desk's "start visit" action.
+    """
     _load_scoped_patient(db, user, patient_id)
     last_screening = (
         get_scoped_query(db, Visit, user)

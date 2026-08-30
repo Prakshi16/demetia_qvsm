@@ -6,21 +6,25 @@ they're Bishal's and Sheetal's, and they call
 """
 from __future__ import annotations
 
+import mimetypes
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from supabase import create_client
 
+from app.config import settings
 from app.db import get_db
 from app.deps import (
     CurrentUser,
     get_current_user,
     get_scoped_query,
     require_clinician,
+    require_receptionist,
 )
 from app.models import DiagnosisHistory, Patient, Visit
-from app.schemas import DiagnosisCreate, VisitCreate, VisitDetailOut
+from app.schemas import DiagnosisCreate, VisitCreate, VisitDetailOut, VisitFileOut
 from app.services.audit import record_audit
 from app.services.visit_logic import decide_visit_type
 
@@ -40,9 +44,12 @@ def _load_scoped_visit(db: Session, user: CurrentUser, visit_id: uuid.UUID) -> V
 def create_visit(
     body: VisitCreate,
     db: Session = Depends(get_db),
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(require_receptionist),
 ) -> Visit:
     """Create a screening or follow-up visit.
+
+    Receptionist-only: the front desk enters all clinical data and uploads;
+    the clinician's job is limited to reviewing the result.
 
     follow_up  -> completed immediately, no review, no model.
     screening  -> awaiting_uploads; modalities added later via the upload endpoints.
@@ -121,6 +128,83 @@ def get_visit(
     return _load_scoped_visit(db, user, visit_id)
 
 
+_FILE_KINDS = {
+    "mri": ("mri_status", "mri_object_path", True),
+    "speech": ("speech_status", "speech_object_path", False),
+}
+
+
+@router.get("/{visit_id}/file/{kind}", response_model=VisitFileOut)
+def get_visit_file(
+    visit_id: uuid.UUID,
+    kind: str,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+) -> VisitFileOut:
+    """A short-lived signed URL for a visit's raw MRI scan or speech recording.
+
+    Any signed-in user at the visit's hospital may fetch it — the clinician
+    needs it to review, the receptionist to confirm the upload. The bucket is
+    private, so the URL is minted per request and expires in an hour.
+    """
+    spec = _FILE_KINDS.get(kind)
+    if spec is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Unknown file kind"
+        )
+    status_attr, path_attr, force_download = spec
+
+    visit = _load_scoped_visit(db, user, visit_id)
+    if getattr(visit, status_attr) != "done":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No {kind} file for this visit",
+        )
+
+    bucket = create_client(
+        settings.SUPABASE_URL, settings.SUPABASE_KEY
+    ).storage.from_(settings.SUPABASE_BUCKET)
+
+    object_path = getattr(visit, path_attr)
+    if not object_path:
+        # Rows uploaded before migration 005 didn't record the path — recover it
+        # by listing the visit's folder.
+        try:
+            entries = bucket.list(f"{kind}/{visit_id}")
+        except Exception:  # noqa: BLE001 - treat any storage error as "not found"
+            entries = []
+        names = [e["name"] for e in entries if e.get("name")]
+        if not names:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"{kind} file not found in storage",
+            )
+        object_path = f"{kind}/{visit_id}/{names[0]}"
+
+    filename = object_path.rsplit("/", 1)[-1]
+    options = {"download": filename} if force_download else None
+    try:
+        signed = (
+            bucket.create_signed_url(object_path, 3600, options)
+            if options is not None
+            else bucket.create_signed_url(object_path, 3600)
+        )
+        url = signed.get("signedURL") or signed.get("signedUrl")
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not generate a download link for this file.",
+        ) from exc
+    if not url:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Storage did not return a signed URL.",
+        )
+
+    content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    return VisitFileOut(url=url, filename=filename, content_type=content_type)
+
+
 @router.post("/{visit_id}/diagnosis", response_model=VisitDetailOut)
 def save_diagnosis(
     visit_id: uuid.UUID,
@@ -162,6 +246,16 @@ def save_diagnosis(
                     "This visit was reviewed on a previous day; a later revision "
                     "goes through a new follow-up visit, not an edit."
                 ),
+            )
+        # A same-day "revision" that changes nothing is a no-op — reject it
+        # rather than write a duplicate history row.
+        if (
+            body.doctor_diagnosis == visit.doctor_diagnosis
+            and (body.doctor_notes or None) == (visit.doctor_notes or None)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No changes to save.",
             )
     else:
         # awaiting_uploads (model hasn't run) or completed (follow-up) — never valid.

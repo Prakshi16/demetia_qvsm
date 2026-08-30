@@ -20,9 +20,9 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { api } from "../api/client";
 
-// Same fixed scale as the screening form: the model was trained on
-// {0, 0.5, 1, 2}, and the trend chart plots against those screening values.
-const CDR_OPTIONS = ["0", "0.5", "1", "2"];
+// Same fixed scale as the screening form (0, 0.5, 1, 2, 3). The model was
+// trained on {0, 0.5, 1, 2}; 3 (severe) is still a valid rating to record.
+const CDR_OPTIONS = ["0", "0.5", "1", "2", "3"];
 
 function toNumberOrNull(value) {
   const trimmed = String(value).trim();

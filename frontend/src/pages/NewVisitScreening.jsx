@@ -24,10 +24,11 @@ import { api } from "../api/client";
 import MriUpload from "../components/MriUpload";
 import SpeechCapture from "../components/SpeechCapture";
 
-// CDR is a fixed clinical scale, and the model was trained on {0, 0.5, 1, 2}
-// only — a free number field would let a 3 through to a pipeline that has never
-// seen one, so this is a select.
-const CDR_OPTIONS = ["0", "0.5", "1", "2"];
+// CDR is a fixed clinical scale (0, 0.5, 1, 2, 3). A select rather than a free
+// number field so only real scale points get through. The model was trained on
+// {0, 0.5, 1, 2}; a 3 (severe) is scaled past the training range, but it's a
+// valid clinical rating and the clinician needs to be able to record it.
+const CDR_OPTIONS = ["0", "0.5", "1", "2", "3"];
 
 const EMPTY_FORM = { mmse: "", cdr: "", edu: "", ses: "" };
 
