@@ -1,0 +1,17 @@
+# Throwaway env (.venv-clean/) for Phase 1.2 step 2 ONLY — speech_02_clean.py
+# (pyannote diarization + DeepFilterNet denoise).
+#
+# Kept separate from .venv/ because deepfilternet pins numpy<2.0 and pulling
+# pyannote.audio + deepfilternet into the main env downgrades numpy and leaves
+# it segfaulting on import. This env never touches qiskit or the pickles — its
+# only output is data/audio_clean/*.wav, consumed by speech_03 from the main env.
+#
+# Let pip resolve versions freely here (numpy will land <2.0, that's fine):
+#   python -m venv .venv-clean
+#   .venv-clean/Scripts/pip install -r scripts/requirements-clean.txt
+#   .venv-clean/Scripts/pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+
+pyannote.audio
+deepfilternet
+librosa
+soundfile
