@@ -16,9 +16,13 @@ dist/
 build/
 
 # Virtual environments
+# (.gitignore has no inline comments — keep patterns on their own line)
 venv/
 env/
 .venv/
+.venv-clean/
+.venv-oasis/
+.venv-ml/
 
 # Secrets
 .env
@@ -47,6 +51,8 @@ PROJECT_CONTEXT.md
 HANDOFF_*.md
 handoff_*.md
 MRI_upload.md
+real_dataset_setup.md
+*_setup.md
 
 # Env files (any level)
 .env

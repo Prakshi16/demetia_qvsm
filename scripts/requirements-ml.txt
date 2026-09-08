@@ -1,0 +1,34 @@
+# MAIN ML / dataset-build environment (.venv/) for real_dataset_setup.md work.
+# NOT installed into the backend image — that stays minimal (backend/requirements.txt).
+#
+# The first block MUST stay byte-identical to backend/requirements.txt so that
+# results/qsvm_model.pkl and results/svm_model.pkl load and predict identically.
+#
+# pyannote.audio + deepfilternet are DELIBERATELY NOT here: they pin numpy<2,
+# which breaks qiskit-machine-learning and (worse) leaves this env segfaulting
+# on import. speech_02_clean.py runs from a separate throwaway env instead —
+# see requirements-clean.txt. Its only output is wav files on disk, so nothing
+# has to cross between the two environments.
+
+# --- frozen ML-serving pins (match backend/requirements.txt) ---
+numpy==2.2.6
+scipy==1.15.3
+scikit-learn==1.7.2
+qiskit==2.4.1
+qiskit-machine-learning==0.9.0
+librosa==0.11.0
+nibabel==5.3.2
+
+# --- dataset assembly ---
+pandas
+openpyxl          # read the OASIS .xlsx files
+soundfile         # robust wav I/O (handles the one IEEE-float clip)
+
+# --- Track A: windowed 18-feature extraction + wav2vec2 age/sex ---
+# transformers pinned to 4.x — the audeering age/gender model ships a custom
+# AgeGenderModel class written against transformers 4; transformers 5's
+# from_pretrained internals ('all_tied_weights_keys') break it.
+transformers==4.46.3
+
+# torch + torchaudio installed separately from the CUDA wheel index:
+#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124

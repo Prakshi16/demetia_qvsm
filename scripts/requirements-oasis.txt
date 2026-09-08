@@ -1,0 +1,14 @@
+# Track B (OASIS tabular) environment — Bishal.
+#
+# Deliberately tiny. NO torch, NO CUDA, NO audio libs, NO MRI libs. Runs on any
+# laptop in ~2 minutes. This track is pure dataframe + scikit-learn work.
+#
+#   python -m venv .venv-oasis
+#   .venv-oasis/Scripts/pip install -r scripts/requirements-oasis.txt   # Windows
+#   .venv-oasis/bin/pip install -r scripts/requirements-oasis.txt       # macOS/Linux
+
+pandas
+numpy
+scikit-learn      # IterativeImputer (MICE), DecisionTreeClassifier for the leak probe
+openpyxl          # read the two OASIS .xlsx files
+pytest            # unit-test scripts/build_real_dataset.py against Appendix-A stubs
