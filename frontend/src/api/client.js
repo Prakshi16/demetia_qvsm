@@ -110,6 +110,35 @@ async function request(path, { method = "GET", body, auth = true } = {}) {
   return payload;
 }
 
+/**
+ * Like `request()` but for a binary response: returns a Blob, not JSON. Used
+ * for file streams (the MRI viewer). Same auth + error shape as `request()`.
+ */
+async function fetchBlob(path) {
+  const headers = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  let response;
+  try {
+    response = await fetch(`${BASE_URL}${path}`, { headers });
+  } catch {
+    throw new ApiError("Cannot reach the server. Is the backend running?", 0);
+  }
+
+  if (!response.ok) {
+    if (response.status === 401 && token) {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+      window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+    }
+    const payload = await response.json().catch(() => ({}));
+    throw new ApiError(readErrorMessage(payload, response.status), response.status);
+  }
+
+  return response.blob();
+}
+
 /** "" -> "", "ada" -> "?search=ada". Keeps the query out of the call sites. */
 function searchQuery(search) {
   const trimmed = (search ?? "").trim();
@@ -194,7 +223,18 @@ export const api = {
   // A short-lived signed URL for a visit's raw upload: kind is "mri" or
   // "speech". Returns { url, filename, content_type, expires_in }. The url
   // points straight at Supabase and expires in ~1h, so fetch it on demand.
+  // Use this for the download link and the <audio> player; the MRI *viewer*
+  // wants getVisitScanBlob (NIfTI-normalised, DICOM decoded server-side).
   getVisitFile: (visitId, kind) => request(`/visits/${visitId}/file/${kind}`),
+
+  // The MRI scan as a NIfTI Blob for the in-browser viewer. Streamed through
+  // the API (auth header, DICOM decoded server-side), so it can't be a plain
+  // <img>/Niivue URL — wrap it in URL.createObjectURL at the call site.
+  getVisitScanBlob: (visitId) => fetchBlob(`/visits/${visitId}/scan`),
+
+  // The speech recording as an MP3 Blob for the <audio> player — transcoded
+  // server-side so it plays in every browser (WebM/Opus doesn't).
+  getVisitAudioBlob: (visitId) => fetchBlob(`/visits/${visitId}/audio`),
 };
 
 /**

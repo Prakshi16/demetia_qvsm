@@ -362,6 +362,20 @@ def run(client: httpx.Client) -> None:
               r.status_code == 200 and bool(r.json().get("url")),
               f"{r.status_code} {r.text[:120]}")
 
+    r = client.get(f"{BASE}/visits/{visit_id}/scan", headers=doctor)
+    check("clinician gets the scan as gzip NIfTI for the viewer",
+          r.status_code == 200
+          and r.headers.get("content-type") == "application/gzip"
+          and r.content[:2] == b"\x1f\x8b",
+          f"{r.status_code} {r.headers.get('content-type')} {len(r.content)}b")
+
+    r = client.get(f"{BASE}/visits/{visit_id}/audio", headers=doctor)
+    check("clinician gets the recording as playable MP3",
+          r.status_code == 200
+          and r.headers.get("content-type") == "audio/mpeg"
+          and r.content[:3] in (b"ID3", b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"),
+          f"{r.status_code} {r.headers.get('content-type')} {len(r.content)}b")
+
     queue = client.get(f"{BASE}/patients/pending-review", headers=doctor).json()
     check("patient reaches the clinician's pending-review queue",
           any(p["id"] == patient_id for p in queue), f"{len(queue)} in queue")

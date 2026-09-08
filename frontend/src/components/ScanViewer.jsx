@@ -57,8 +57,8 @@ export default function ScanViewer({ url, filename }) {
       ) : null}
       {status === "error" ? (
         <p className="visit-note scan-viewer__overlay">
-          Couldn’t load the scan — the link may have expired. Close and reopen
-          the viewer to refresh it.
+          Couldn’t render this scan in the browser. Use “Download” to open it in
+          a viewer.
         </p>
       ) : null}
     </div>
