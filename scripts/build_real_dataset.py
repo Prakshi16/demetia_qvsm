@@ -582,12 +582,19 @@ def _write_match_variant(
         dataset_1to1.to_csv(output_dir / "multimodal_real_1to1.csv", index=False)
         unmatched_oasis.to_csv(output_dir / "unmatched_oasis.csv", index=False)
         unmatched_speakers.to_csv(output_dir / "unmatched_speakers.csv", index=False)
-    reuse = provenance["speaker_row_count"].value_counts().sort_index().to_dict() if not provenance.empty else {}
+    reuse_histogram: dict[str, dict[int, int]] = {}
+    if not provenance.empty:
+        speaker_rows = provenance.drop_duplicates("speaker_id")
+        for (label, sex), cell in speaker_rows.groupby(["label", "sex"], sort=True):
+            reuse_histogram[f"{int(label)}|{sex}"] = {
+                int(count): int(n_speakers)
+                for count, n_speakers in cell["speaker_row_count"].value_counts().sort_index().items()
+            }
     widened = int(provenance["window_widened"].sum()) if not provenance.empty else 0
     print(
         f"{variant}: rows={len(dataset)} speakers={provenance['speaker_id'].nunique() if not provenance.empty else 0} "
         f"oasis_subjects={provenance['oasis_subject_id'].nunique() if not provenance.empty else 0} "
-        f"dropped_oasis={len(unmatched_oasis)} widened={widened} speaker_row_count_hist={reuse}"
+        f"dropped_oasis={len(unmatched_oasis)} widened={widened} reuse_histogram={reuse_histogram}"
     )
 
 

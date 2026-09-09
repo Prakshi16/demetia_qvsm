@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -188,6 +189,90 @@ def test_match_is_deterministic_and_obeys_one_to_one_oasis_assignment():
     pd.testing.assert_frame_equal(first_matched, second_matched)
     assert first_matched["oasis_subject_id"].is_unique
     assert first_matched["no_contradiction"].all()
+
+
+def test_match_stratifies_and_prefers_nearest_age():
+    pool = _pool().iloc[[0]].copy()
+    pool["age"] = 54
+    speakers = pd.DataFrame(
+        [
+            ["speaker_f50", 0, "F", 50, 40, 70, "lookup", "test"],
+            ["speaker_f55", 0, "F", 55, 40, 70, "lookup", "test"],
+            ["speaker_m", 1, "M", 54, 40, 70, "lookup", "test"],
+        ],
+        columns=["speaker_id", "label", "sex", "age_final", "age_lo", "age_hi", "age_source", "orig_split"],
+    )
+    windows = _windows().query("speaker_id == 'speaker_f0'").copy()
+    windows["speaker_id"] = "speaker_f55"
+    matched, _, _ = match_windows(pool, speakers, windows, r_max=18)
+    assert len(matched) == 1
+    assert matched.iloc[0]["speaker_id"] == "speaker_f55"
+    assert matched.iloc[0]["label"] == 0
+    assert matched.iloc[0]["sex"] == "F"
+    assert not bool(matched.iloc[0]["window_widened"])
+
+
+def test_match_respects_speaker_reuse_cap():
+    pool = pd.concat([_pool().iloc[[0]]] * 3, ignore_index=True)
+    pool["oasis_subject_id"] = ["OAS1_A", "OAS1_B", "OAS1_C"]
+    pool["age"] = [50, 51, 52]
+    speakers = _speakers().iloc[[0]].copy()
+    windows = _windows().query("speaker_id == 'speaker_f0'").copy()
+    windows = pd.concat([windows] * 2, ignore_index=True)
+    windows["window_idx"] = range(len(windows))
+    matched, unmatched_oasis, _ = match_windows(pool, speakers, windows, r_max=2)
+    assert len(matched) == 2
+    assert len(unmatched_oasis) == 1
+    assert matched["speaker_id"].value_counts().max() <= 2
+
+
+def test_match_enforces_strict_age_then_widens_once():
+    pool = _pool().iloc[[0]].copy()
+    pool["age"] = 70
+    strict_speaker = pd.DataFrame(
+        [["speaker_strict", 0, "F", 70, 69, 71, "lookup", "test"]],
+        columns=["speaker_id", "label", "sex", "age_final", "age_lo", "age_hi", "age_source", "orig_split"],
+    )
+    strict_windows = _windows().query("speaker_id == 'speaker_f0'").iloc[[0]].copy()
+    strict_windows["speaker_id"] = "speaker_strict"
+    matched, _, _ = match_windows(pool, strict_speaker, strict_windows)
+    assert len(matched) == 1
+    assert not bool(matched.iloc[0]["window_widened"])
+
+    widened_speaker = strict_speaker.copy()
+    widened_speaker["age_final"] = 55
+    widened_speaker["age_lo"] = 54
+    widened_speaker["age_hi"] = 56
+    matched, _, _ = match_windows(pool, widened_speaker, strict_windows)
+    assert len(matched) == 1
+    assert bool(matched.iloc[0]["window_widened"])
+
+    pool["age"] = 71
+    matched, unmatched_oasis, _ = match_windows(pool, widened_speaker, strict_windows)
+    assert matched.empty
+    assert len(unmatched_oasis) == 1
+
+
+def test_contradiction_detection_and_group_id():
+    matched = match_windows(_pool(), _speakers(), _windows())[0]
+    assert (matched["group_id"] == matched["speaker_id"] + "|" + matched["oasis_subject_id"]).all()
+    broken = matched.copy()
+    broken.loc[0, "no_contradiction"] = False
+    with pytest.raises(AssertionError):
+        assemble_outputs(broken)
+
+
+def test_raw_and_clean_assembly_preserves_distinct_speech_values():
+    raw_matched = match_windows(_pool(), _speakers(), _windows())[0]
+    clean_windows = _windows().copy()
+    clean_windows["pitch_mean"] = clean_windows["pitch_mean"] + 100
+    clean_matched = match_windows(_pool(), _speakers(), clean_windows)[0]
+    raw_dataset, raw_provenance = assemble_outputs(raw_matched)
+    clean_dataset, clean_provenance = assemble_outputs(clean_matched)
+    assert list(raw_dataset.columns) == DATASET_COLUMNS
+    assert list(clean_provenance.columns) == list(raw_provenance.columns)
+    assert raw_dataset["Subject_ID"].tolist() == clean_dataset["Subject_ID"].tolist()
+    assert not raw_dataset["pitch_mean"].equals(clean_dataset["pitch_mean"])
 
 
 def test_match_widens_once_and_records_the_effective_bounds():
