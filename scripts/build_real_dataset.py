@@ -131,6 +131,19 @@ def _normalise_sex(series: pd.Series) -> pd.Series:
     return values.astype("string")
 
 
+# OASIS-1's `Educ` is a 1-5 education-level CATEGORY (1=less than HS, 2=HS grad,
+# 3=some college, 4=college grad, 5=beyond college/grad degree) -- a completely
+# different scale from OASIS-2's `EDUC`, which is literal YEARS of education
+# (6-23 in this cohort). Concatenating them unconverted silently mixes a 1-5
+# ordinal with a 6-23 continuous scale under one "EDUC" column. Fixed 2026-09-24
+# (caught during the Phase 1.10 backend migration -- see real_dataset_setup.md
+# Appendix A/C) by mapping OASIS-1's category onto the midpoint of the
+# conventional US years-of-education band for that category, matching the
+# crosswalk used in prior OASIS-1 ML work. Approximate, but far better than
+# treating "3" (some college) as three years of school.
+OASIS1_EDUC_CATEGORY_TO_YEARS = {1: 8, 2: 12, 3: 14, 4: 16, 5: 18}
+
+
 def _empty_standard_rows(source: str, frame: pd.DataFrame) -> pd.DataFrame:
     mri_col = _find_column(frame, "MRI_ID", "ID")
     subject_col = _find_column(frame, "Subject_ID", "SubjectID") if source == "oasis2" else None
@@ -147,7 +160,10 @@ def _empty_standard_rows(source: str, frame: pd.DataFrame) -> pd.DataFrame:
     result["mri_id"] = frame[mri_col].astype("string").str.strip()
     result["sex"] = _normalise_sex(frame[sex_col])
     result["age"] = _numeric(frame[age_col])
-    result["EDUC"] = _numeric(frame[educ_col])
+    educ_numeric = _numeric(frame[educ_col])
+    if source == "oasis1":
+        educ_numeric = educ_numeric.map(OASIS1_EDUC_CATEGORY_TO_YEARS).astype(float)
+    result["EDUC"] = educ_numeric
     for field in ["MMSE", "SES", "nWBV", "eTIV", "ASF", "CDR"]:
         source_col = _find_column(frame, field)
         result[field] = _numeric(frame[source_col])

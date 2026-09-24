@@ -60,12 +60,15 @@ def _windows() -> pd.DataFrame:
 
 
 def _oasis1_sheet() -> pd.DataFrame:
+    # Educ here is OASIS-1's 1-5 education-LEVEL CATEGORY (2=HS grad, 3=some college, ...),
+    # not years -- see OASIS1_EDUC_CATEGORY_TO_YEARS. 2->12, 3->14, matching the expected
+    # EDUC values asserted below.
     frame = pd.DataFrame(
         [
-            ["OAS1_0001_MR1", "female", 50, 12, 28, 2, 0.8, 1400, 1.1, 0.0],
-            ["OAS1_0002_MR1", "M", 60, 14, 20, None, 0.7, 1300, 1.2, 1.0],
-            ["OAS1_0003_MR2", "F", 61, 15, 21, 1, 0.7, 1301, 1.2, 0.5],
-            ["OAS1_0004_MR1", "M", 62, 13, 22, 1, 0.7, 1302, 1.2, None],
+            ["OAS1_0001_MR1", "female", 50, 2, 28, 2, 0.8, 1400, 1.1, 0.0],
+            ["OAS1_0002_MR1", "M", 60, 3, 20, None, 0.7, 1300, 1.2, 1.0],
+            ["OAS1_0003_MR2", "F", 61, 4, 21, 1, 0.7, 1301, 1.2, 0.5],
+            ["OAS1_0004_MR1", "M", 62, 3, 22, 1, 0.7, 1302, 1.2, None],
         ],
         columns=["ID", "M/F", "Age", "Educ", "MMSE", "SES", "nWBV", "eTIV", "ASF", "CDR"],
     )
