@@ -322,8 +322,8 @@ def run(client: httpx.Client) -> None:
                            files={"file": ("s.nii.gz", nifti, "application/gzip")})
     response.raise_for_status()
     after_mri = response.json()
-    check("MRI persists a 4-feature vector",
-          len(after_mri.get("mri_feature_vector") or []) == 4,
+    check("MRI persists a 2-feature vector",
+          len(after_mri.get("mri_feature_vector") or []) == 2,
           str(after_mri.get("mri_feature_vector")))
     check("one modality is not enough: still awaiting_uploads, no prediction",
           after_mri["status"] == "awaiting_uploads"

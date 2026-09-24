@@ -7,11 +7,9 @@ from pathlib import Path
 from typing import BinaryIO, Protocol
 
 
-MRI_FEATURE_ORDER: tuple[str, str, str, str] = (
+MRI_FEATURE_ORDER: tuple[str, str] = (
     "nWBV",
     "eTIV",
-    "hippocampal_volume",
-    "cortical_thickness",
 )
 
 
@@ -26,7 +24,7 @@ class MriFeatureExtractionNotReady(RuntimeError):
 
 
 class MriFeatureExtractionError(ValueError):
-    """Raised when an MRI file cannot be converted into the 4-feature vector."""
+    """Raised when an MRI file cannot be converted into the 2-feature vector."""
 
 
 def validate_mri_feature_vector(features: list[float]) -> list[float]:
@@ -45,13 +43,16 @@ def validate_mri_feature_vector(features: list[float]) -> list[float]:
 
 
 def extract_mri_features(file: UploadFileLike) -> list[float]:
-    """Extract a 4-value MRI feature vector from an uploaded scan.
+    """Extract a 2-value MRI feature vector from an uploaded scan.
 
     Feature order:
     1. nWBV
     2. eTIV
-    3. hippocampal_volume
-    4. cortical_thickness
+
+    `hippocampal_volume`/`cortical_thickness` were retired with the 27->24 real-data migration
+    (real_dataset_setup.md Appendix C) -- they were synthetic-only estimates with no OASIS tabular
+    counterpart, and are not part of the real training data's clinical/MRI feature set. Phase 2 of
+    the build plan will eventually replace nWBV/eTIV themselves with a learned 3D-CNN embedding.
 
     Important:
     This is a lightweight demo extractor written from scratch so Bishal's upload module
@@ -75,23 +76,11 @@ def extract_mri_features(file: UploadFileLike) -> list[float]:
     etiv_ml = _volume_ml(intracranial_mask, voxel_volume_mm3)
     brain_volume_ml = _volume_ml(brain_mask, voxel_volume_mm3)
     nwbv = _clamp(brain_volume_ml / etiv_ml, 0.35, 0.95)
-    hippocampal_volume_mm3 = _estimate_hippocampal_volume_mm3(
-        normalized_volume=normalized_volume,
-        brain_mask=brain_mask,
-        etiv_ml=etiv_ml,
-    )
-    cortical_thickness_mm = _estimate_cortical_thickness_mm(
-        normalized_volume=normalized_volume,
-        brain_mask=brain_mask,
-        nwbv=nwbv,
-    )
 
     return validate_mri_feature_vector(
         [
             round(nwbv, 4),
             round(etiv_ml, 2),
-            round(hippocampal_volume_mm3, 2),
-            round(cortical_thickness_mm, 3),
         ]
     )
 
@@ -204,59 +193,6 @@ def _estimate_brain_mask(normalized_volume: "object", intracranial_mask: "object
     return _clean_binary_mask(brain_mask)
 
 
-def _estimate_hippocampal_volume_mm3(
-    normalized_volume: "object",
-    brain_mask: "object",
-    etiv_ml: float,
-) -> float:
-    import numpy as np
-
-    bounds = _mask_bounds(brain_mask)
-
-    if bounds is None:
-        raise MriFeatureExtractionError("Unable to locate MRI brain mask bounds.")
-
-    x0, x1, y0, y1, z0, z1 = bounds
-    width = max(x1 - x0, 1)
-    height = max(y1 - y0, 1)
-    depth = max(z1 - z0, 1)
-
-    # Central-inferior medial temporal proxy region. This is a heuristic ROI, not an
-    # anatomical hippocampus segmentation.
-    roi = np.zeros_like(brain_mask, dtype=bool)
-    roi[
-        x0 + int(width * 0.35) : x0 + int(width * 0.65),
-        y0 + int(height * 0.45) : y0 + int(height * 0.78),
-        z0 + int(depth * 0.25) : z0 + int(depth * 0.58),
-    ] = True
-
-    roi_brain = roi & brain_mask
-    whole_brain_mean = float(normalized_volume[brain_mask].mean())
-    roi_mean = float(normalized_volume[roi_brain].mean()) if roi_brain.any() else whole_brain_mean
-    intensity_factor = _clamp(roi_mean / max(whole_brain_mean, 1e-6), 0.75, 1.25)
-
-    # Typical total hippocampal volume is roughly 0.3-0.5% of intracranial volume.
-    hippocampal_ratio = _clamp(0.0038 * intensity_factor, 0.0022, 0.0060)
-    return etiv_ml * 1000.0 * hippocampal_ratio
-
-
-def _estimate_cortical_thickness_mm(
-    normalized_volume: "object",
-    brain_mask: "object",
-    nwbv: float,
-) -> float:
-    import numpy as np
-
-    gradients = np.gradient(normalized_volume)
-    gradient_magnitude = np.sqrt(sum(component * component for component in gradients))
-    edge_density = float(np.percentile(gradient_magnitude[brain_mask], 75))
-    edge_penalty = _clamp(edge_density * 4.0, 0.0, 0.7)
-
-    # Produces values in a plausible adult cortical-thickness range for demo data.
-    thickness = 2.15 + (1.25 * nwbv) - edge_penalty
-    return _clamp(thickness, 1.5, 4.5)
-
-
 def _otsu_threshold(values: "object") -> float:
     import numpy as np
 
@@ -320,27 +256,6 @@ def _clean_binary_mask(mask: "object") -> "object":
     largest_label = int(component_sizes.argmax()) + 1
 
     return labels == largest_label
-
-
-def _mask_bounds(mask: "object") -> tuple[int, int, int, int, int, int] | None:
-    import numpy as np
-
-    coordinates = np.argwhere(mask)
-
-    if coordinates.size == 0:
-        return None
-
-    mins = coordinates.min(axis=0)
-    maxs = coordinates.max(axis=0) + 1
-
-    return (
-        int(mins[0]),
-        int(maxs[0]),
-        int(mins[1]),
-        int(maxs[1]),
-        int(mins[2]),
-        int(maxs[2]),
-    )
 
 
 def _volume_ml(mask: "object", voxel_volume_mm3: float) -> float:

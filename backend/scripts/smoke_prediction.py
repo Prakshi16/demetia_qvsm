@@ -2,8 +2,12 @@
 
 Exercises exactly what an upload endpoint triggers — feature assembly, ASF
 derivation, both pipelines, and the visit state transition — using two real
-patients from the Phase 1 synthetic set, embedded as literals so this runs for
-anyone (``data/`` is gitignored and teammates don't have it).
+patients from the real assembled dataset (real_dataset_setup.md), embedded as
+literals so this runs for anyone (``data/`` is gitignored and teammates don't
+have it). Both rows were confirmed against the 2026-09-24 retrained pickles
+(``results/qsvm_model.pkl`` / ``results/svm_model.pkl``) to predict their true
+label under the *served* feature path (ASF derived from eTIV, not read from the
+CSV — see ``prediction.py``'s ASF note) before being hardcoded here.
 
 Run inside the backend container, where the pickles are mounted at /model:
 
@@ -29,28 +33,30 @@ from app.services import prediction as P  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)-7s %(message)s")
 
-# Two real rows from data/multimodal_dementia_dataset.csv.
+# Two real rows from data/multimodal_dementia_dataset.csv (real, windowed OASIS x speech
+# match). `cdr` is display-only (not a model input any more -- see prediction.py's CDR
+# note) and is left unset here; the model never reads it.
 PATIENTS = [
     {
-        "name": "Label=0 (Nondemented)",
+        "name": "oasis1_OAS1_0366_w0 -- Label=0 (Nondemented)",
         "truth": "Nondemented",
-        "clinical": {"mmse": 27.0, "cdr": 0.0, "edu": 12.0, "ses": 1.0},
-        "mri": [0.7086, 1483.0, 3733.0, 2.882],
+        "clinical": {"mmse": 29.0, "edu": 18.0, "ses": 2.0},
+        "mri": [0.813, 1549.0],
         "speech": [
-            0.1394, 3.762, 183.02, 0.0131, 0.0319,
-            -121.6294, 92.1315, -28.5762, 21.6312, -4.8336, 16.8712, 0.6979,
-            -3.7927, -13.9246, 4.4381, 6.4459, 2.4058, 1.6888,
+            0.2004, 5.7, 164.53, 0.0322, 0.1819,
+            -384.251, 98.5568, 20.7769, 19.3264, -10.1216, 1.6509, -9.008,
+            1.4172, -5.835, 0.7632, 2.1167, 4.4212, 8.7332,
         ],
     },
     {
-        "name": "Label=1 (Demented)",
+        "name": "oasis1_OAS1_0041_w0 -- Label=1 (Demented)",
         "truth": "Demented",
-        "clinical": {"mmse": 17.0, "cdr": 2.0, "edu": 14.0, "ses": 1.0},
-        "mri": [0.6818, 1482.0, 2796.0, 2.133],
+        "clinical": {"mmse": 28.0, "edu": 12.0, "ses": 3.1577},
+        "mri": [0.758, 1350.0],
         "speech": [
-            0.4051, 2.576, 162.74, 0.0302, 0.0581,
-            -204.7345, 79.0004, -37.1021, 16.1889, -2.2165, 0.0913, -16.7343,
-            5.4937, -16.9116, -1.4661, -11.1288, -8.6044, -10.0588,
+            0.2004, 4.2, 197.8473, 0.0669, 0.1761,
+            -237.7371, 104.5047, -4.1745, 17.4252, -10.0145, -2.6665, -8.6135,
+            -8.8318, -5.3759, -6.6223, -4.2719, -3.0018, 0.4886,
         ],
     },
 ]
@@ -88,15 +94,15 @@ def main() -> int:
         visit = build_visit(spec)
 
         row = P.build_feature_row(visit)
-        if len(row) != 27:
-            failures.append(f"{spec['name']}: feature row was {len(row)}, expected 27")
+        if len(row) != 24:
+            failures.append(f"{spec['name']}: feature row was {len(row)}, expected 24")
 
         started = time.perf_counter()
         fired = P.check_and_run_prediction(None, visit)
         elapsed = time.perf_counter() - started
 
         print(f"{spec['name']}")
-        print(f"  ASF derived from eTIV : {row[2]:.4f}  (eTIV {row[6]:.1f})")
+        print(f"  ASF derived from eTIV : {row[1]:.4f}  (eTIV {row[5]:.1f})")
         print(f"  fired                 : {fired}   status -> {visit.status}")
         print(f"  Quantum SVM           : {visit.model_prediction}  margin {visit.model_confidence:.4f}")
         print(f"  Classical SVM         : {visit.svm_prediction}  margin {visit.svm_confidence:.4f}")

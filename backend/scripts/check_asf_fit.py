@@ -1,10 +1,17 @@
 """Reproduce the ASF-from-eTIV derivation used at inference, and measure its cost.
 
-The Phase 1 pickle expects 27 features including ASF (Atlas Scaling Factor). The
+The pickle expects 24 features including ASF (Atlas Scaling Factor). The
 hospital app never collects ASF — it is imaging-derived — so serving recovers it
 from eTIV. This script produces the numbers quoted in
 ``app/services/prediction.py`` so they can be checked rather than trusted, and so
 the R^2 figure is available for the report.
+
+**2026-09-24 real-data update:** the training set itself is now real OASIS data
+(real_dataset_setup.md), not a synthetic generator, so the original "synthetic
+vs real" skew this script measured no longer exists as a *source* mismatch --
+both sides are now OASIS-derived. What's still worth checking: does deriving ASF
+from eTIV (rather than reading the OASIS pool's own true ASF) change any
+prediction on the training set, now that the model is the real-data pickle.
 
 Run from the repository root:
 
@@ -22,12 +29,12 @@ import pandas as pd
 warnings.filterwarnings("ignore")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SYNTHETIC = REPO_ROOT / "data" / "multimodal_dementia_dataset.csv"
-REAL = REPO_ROOT / "data" / "oasis_longitudinal_demographics.xlsx"
+TRAINING_SET = REPO_ROOT / "data" / "multimodal_dementia_dataset.csv"
+REAL = REPO_ROOT / "data" / "oasis2_mri_clinical.xlsx"
 QSVM = REPO_ROOT / "results" / "qsvm_model.pkl"
 
-CLINICAL = ["CDR", "MMSE", "ASF", "EDUC", "SES"]
-MRI = ["nWBV", "eTIV", "hippocampal_volume", "cortical_thickness"]
+CLINICAL = ["MMSE", "ASF", "EDUC", "SES"]
+MRI = ["nWBV", "eTIV"]
 SPEECH = [
     "pause_rate",
     "speech_rate",
@@ -62,26 +69,27 @@ def fit_constant(name: str, etiv, asf) -> float:
 
 def main() -> None:
     print("\n1. Fit ASF = C / eTIV")
-    synthetic = pd.read_csv(SYNTHETIC)
-    fit_constant("synthetic (training)", synthetic["eTIV"], synthetic["ASF"])
+    training = pd.read_csv(TRAINING_SET)
+    fit_constant("training set (real, windowed)", training["eTIV"], training["ASF"])
 
     real = pd.read_excel(REAL)
-    real_constant = fit_constant("real OASIS-2", real["eTIV"], real["ASF"])
+    real_constant = fit_constant("real OASIS-2 (full)", real["eTIV"], real["ASF"])
 
     print(
-        "\n  On real patients the relation is EXACT (R^2 = 1.000000): OASIS derives\n"
-        "  eTIV from the atlas scaling factor, so ASF = C/eTIV is an identity, not\n"
-        "  an approximation. On the synthetic training set R^2 is NEGATIVE — the\n"
-        "  generator drew ASF and eTIV independently — so the ASF we serve is\n"
-        "  distributed differently from the ASF the pickle was trained on."
+        "\n  The training set is now real OASIS data too (its ASF column is copied\n"
+        "  straight from oasis_pool.csv, not synthesised), so this fit should also be\n"
+        "  ~exact -- OASIS derives eTIV from the atlas scaling factor, ASF = C/eTIV is\n"
+        "  an identity on both the full OASIS-2 export and the matched training subset.\n"
+        "  There is no more synthetic-vs-real skew from this source; ASF_ETIV_CONST\n"
+        "  (1755.0, hardcoded in prediction.py) should be close to both C values above."
     )
 
-    print("\n2. Does that train/serve skew change any prediction?")
+    print("\n2. Does deriving ASF (vs. reading the OASIS pool's true ASF) change any prediction?")
     with QSVM.open("rb") as handle:
         pipeline = pickle.load(handle)
 
-    features = synthetic[FEATURE_ORDER].to_numpy(dtype=float)
-    labels = synthetic["Label"].to_numpy()
+    features = training[FEATURE_ORDER].to_numpy(dtype=float)
+    labels = training["Label"].to_numpy()
     baseline = pipeline.predict(features)
 
     derived = features.copy()
@@ -89,21 +97,21 @@ def main() -> None:
     derived_predictions = pipeline.predict(derived)
 
     constant_row = features.copy()
-    constant_row[:, ASF_INDEX] = synthetic["ASF"].mean()
+    constant_row[:, ASF_INDEX] = training["ASF"].mean()
     constant_predictions = pipeline.predict(constant_row)
 
-    print(f"  true ASF        accuracy {np.mean(baseline == labels):.4f}")
+    print(f"  true ASF (from pool)  accuracy {np.mean(baseline == labels):.4f}")
     print(
-        f"  derived ASF     accuracy {np.mean(derived_predictions == labels):.4f}"
+        f"  derived ASF (served)  accuracy {np.mean(derived_predictions == labels):.4f}"
         f"   flips {int((baseline != derived_predictions).sum())}/{len(labels)}"
     )
     print(
-        f"  constant ASF    accuracy {np.mean(constant_predictions == labels):.4f}"
+        f"  constant ASF          accuracy {np.mean(constant_predictions == labels):.4f}"
         f"   flips {int((baseline != constant_predictions).sum())}/{len(labels)}"
     )
     print(
-        "\n  Zero flips either way: the MRI block dominates the fused decision, so\n"
-        "  the skew is documented and quantified rather than material.\n"
+        "\n  Flip count above is the served-vs-true ASF impact on this real training set --\n"
+        "  see the printed numbers, not an assumed zero, for what actually happened.\n"
     )
 
 

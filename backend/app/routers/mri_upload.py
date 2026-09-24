@@ -1,7 +1,7 @@
 """
 MRI upload endpoint.
 
-Uploads an MRI scan, stores it in Supabase Storage, extracts the 4-feature
+Uploads an MRI scan, stores it in Supabase Storage, extracts the 2-feature
 MRI vector, saves it to the visit, and triggers prediction if both modalities
 are complete.
 """

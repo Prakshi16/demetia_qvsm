@@ -27,9 +27,18 @@ SERVING NOTES (decisions resolved in the model-serving pass)
   percentage likelihood. One ``decision_function`` call also yields the label
   from its sign, so we spend one ~445 ms kernel evaluation per model, not two.
 
-* **ASF is derived from eTIV.** The pickle wants 27 features including ``ASF``
+* **ASF is derived from eTIV.** The pickle wants 24 features including ``ASF``
   (Atlas Scaling Factor), which the app never collects. See ``ASF_ETIV_CONST``
   below for the fit and its measured impact.
+
+* **CDR is not a model input (2026-09-24, real-data migration).** OASIS's dementia
+  label is defined *from* CDR, so feeding CDR to the model would re-inject the
+  label as a feature. The app still collects/stores ``visit.cdr`` for clinical
+  display (see ``patients.py``'s MMSE/CDR trend), it just isn't part of
+  ``build_feature_row`` any more. Clinical block is now ``[MMSE, ASF, EDUC, SES]``
+  (4, not 5) and the MRI block is ``[nWBV, eTIV]`` (2, not 4 —
+  ``hippocampal_volume``/``cortical_thickness`` were synthetic-only estimates with
+  no OASIS tabular counterpart). Total row length: 24.
 
 * **No inference-time noise.** Phase 1's ``SIGMA_FRAC`` noise injection was a
   property of the *evaluation* (it produced an honest CV number on trivially
@@ -70,26 +79,22 @@ SVM_PICKLE = "svm_model.pkl"
 #   * real OASIS-2 (n=373): C = 1755.0, R^2 = 1.000000, MAE = 0.00000
 #     -> on real patients this is not an approximation at all, it is an exact
 #        identity: OASIS derives eTIV FROM the atlas scaling factor.
-#   * synthetic training set (n=225): the same fit gives R^2 = -0.48, because the
-#     synthetic generator drew ASF and eTIV independently. So the served ASF is
-#     distributed differently from the ASF the pickle was trained on — genuine
-#     train/serve skew on one of five clinical features.
-#
-# Measured impact of that skew: substituting derived ASF for true ASF across all
-# 225 synthetic rows flipped **0 predictions** (accuracy 1.000 either way); so did
-# substituting a constant. The MRI block dominates the fused decision. The skew is
-# therefore documented and quantified rather than material.
+#   * The training set is now real OASIS data too (see real_dataset_setup.md), so
+#     this constant is no longer a train/serve skew the way it was against the
+#     old synthetic set — it is the same identity on both sides.
 #
 # Reproduce: backend/scripts/check_asf_fit.py
 ASF_ETIV_CONST = 1755.0
 
-# Fallbacks for nullable clinical columns (medians of the synthetic training set).
-# `edu`/`ses` are screening-only and nullable; a screening visit should always
-# carry them, but the pipeline cannot accept NaN, so we impute rather than 500.
-EDUC_FALLBACK = 13.0
-SES_FALLBACK = 3.0
-MMSE_FALLBACK = 26.0
-CDR_FALLBACK = 0.5
+# Fallbacks for nullable clinical columns (medians of the real training set,
+# data/multimodal_dementia_dataset.csv, recomputed 2026-09-24 after the real-data
+# retrain — see real_dataset_setup.md Appendix C). `edu`/`ses` are screening-only
+# and nullable; a screening visit should always carry them, but the pipeline
+# cannot accept NaN, so we impute rather than 500. CDR has no fallback here: it
+# is not a model input (see the CDR note above).
+EDUC_FALLBACK = 14.0
+SES_FALLBACK = 2.31
+MMSE_FALLBACK = 28.0
 
 # Maps the pickle's integer classes onto the visits.model_prediction enum.
 CLASS_LABELS = {0: "Nondemented", 1: "Demented"}
@@ -161,11 +166,11 @@ def _first(value: float | None, fallback: float) -> float:
 
 
 def build_feature_row(visit: Visit) -> list[float]:
-    """Assemble the 27-feature row in the exact Phase 1 column order.
+    """Assemble the 24-feature row in the exact real-data column order.
 
-    [0:5]   clinical  CDR, MMSE, ASF, EDUC, SES
-    [5:9]   mri       nWBV, eTIV, hippocampal_volume, cortical_thickness
-    [9:27]  speech    pause_rate, speech_rate, pitch_mean, jitter, shimmer,
+    [0:4]   clinical  MMSE, ASF, EDUC, SES   (CDR dropped -- see the CDR note above)
+    [4:6]   mri       nWBV, eTIV
+    [6:24]  speech    pause_rate, speech_rate, pitch_mean, jitter, shimmer,
                       mfcc_1 .. mfcc_13
 
     Kept public so it can be unit-tested without loading a pickle.
@@ -173,8 +178,8 @@ def build_feature_row(visit: Visit) -> list[float]:
     mri = [float(value) for value in (visit.mri_feature_vector or [])]
     speech = [float(value) for value in (visit.speech_feature_vector or [])]
 
-    if len(mri) != 4:
-        raise ValueError(f"MRI feature vector must have 4 values, got {len(mri)}")
+    if len(mri) != 2:
+        raise ValueError(f"MRI feature vector must have 2 values, got {len(mri)}")
     if len(speech) != 18:
         raise ValueError(f"Speech feature vector must have 18 values, got {len(speech)}")
 
@@ -184,7 +189,6 @@ def build_feature_row(visit: Visit) -> list[float]:
     asf = ASF_ETIV_CONST / etiv
 
     clinical = [
-        _first(visit.cdr, CDR_FALLBACK),
         _first(visit.mmse, MMSE_FALLBACK),
         asf,
         _first(visit.edu, EDUC_FALLBACK),
@@ -192,8 +196,8 @@ def build_feature_row(visit: Visit) -> list[float]:
     ]
 
     row = clinical + mri + speech
-    if len(row) != 27:
-        raise ValueError(f"Expected a 27-feature row, built {len(row)}")
+    if len(row) != 24:
+        raise ValueError(f"Expected a 24-feature row, built {len(row)}")
     return row
 
 
