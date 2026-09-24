@@ -82,12 +82,16 @@ export default function VisitDetail() {
   const [showHistory, setShowHistory] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
-  // Uploaded files: signed URLs fetched on demand (they expire in ~1h).
-  const [speechFile, setSpeechFile] = useState(null);
-  const [speechFileError, setSpeechFileError] = useState("");
-  const [mriFile, setMriFile] = useState(null);
-  const [mriFileError, setMriFileError] = useState("");
+  // Speech: an object URL for an MP3 blob (transcoded server-side so it plays
+  // everywhere), fetched on load.
+  const [speechUrl, setSpeechUrl] = useState(null);
+  const [speechError, setSpeechError] = useState("");
+  // MRI: an object URL for the viewer (NIfTI blob streamed through the API),
+  // opened on demand; the download link uses a separate signed URL.
+  const [mriScanUrl, setMriScanUrl] = useState(null);
+  const [mriError, setMriError] = useState("");
   const [mriLoading, setMriLoading] = useState(false);
+  const [mriDownloading, setMriDownloading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,10 +113,10 @@ export default function VisitDetail() {
         // demand, so its URL is fetched from the button instead.
         if (loadedVisit.speech_status === "done") {
           try {
-            const file = await api.getVisitFile(visitId, "speech");
-            if (!cancelled) setSpeechFile(file);
+            const blob = await api.getVisitAudioBlob(visitId);
+            if (!cancelled) setSpeechUrl(URL.createObjectURL(blob));
           } catch (error) {
-            if (!cancelled) setSpeechFileError(error.message);
+            if (!cancelled) setSpeechError(error.message);
           }
         }
       } catch (error) {
@@ -128,29 +132,53 @@ export default function VisitDetail() {
     };
   }, [visitId]);
 
-  async function openMri() {
-    setMriFileError("");
-    if (mriFile) {
-      setMriFile(null); // toggle the viewer closed
+  // Revoke object URLs when they change or the page unmounts.
+  useEffect(() => {
+    if (!mriScanUrl) return undefined;
+    return () => URL.revokeObjectURL(mriScanUrl);
+  }, [mriScanUrl]);
+  useEffect(() => {
+    if (!speechUrl) return undefined;
+    return () => URL.revokeObjectURL(speechUrl);
+  }, [speechUrl]);
+
+  async function toggleMri() {
+    setMriError("");
+    if (mriScanUrl) {
+      setMriScanUrl(null); // close the viewer (URL revoked by the effect)
       return;
     }
     setMriLoading(true);
     try {
-      const file = await api.getVisitFile(visitId, "mri");
-      setMriFile(file);
+      const blob = await api.getVisitScanBlob(visitId);
+      setMriScanUrl(URL.createObjectURL(blob));
     } catch (error) {
-      setMriFileError(error.message);
+      setMriError(error.message);
     } finally {
       setMriLoading(false);
     }
   }
 
-  async function retrySpeechFile() {
-    setSpeechFileError("");
+  async function downloadMri() {
+    setMriError("");
+    setMriDownloading(true);
     try {
-      setSpeechFile(await api.getVisitFile(visitId, "speech"));
+      const { url } = await api.getVisitFile(visitId, "mri");
+      window.open(url, "_blank", "noopener,noreferrer");
     } catch (error) {
-      setSpeechFileError(error.message);
+      setMriError(error.message);
+    } finally {
+      setMriDownloading(false);
+    }
+  }
+
+  async function retrySpeech() {
+    setSpeechError("");
+    try {
+      const blob = await api.getVisitAudioBlob(visitId);
+      setSpeechUrl(URL.createObjectURL(blob));
+    } catch (error) {
+      setSpeechError(error.message);
     }
   }
 
@@ -304,31 +332,29 @@ export default function VisitDetail() {
                     <button
                       type="button"
                       className="button-quiet"
-                      onClick={openMri}
+                      onClick={toggleMri}
                       disabled={mriLoading}
                     >
                       {mriLoading
                         ? "Opening…"
-                        : mriFile
+                        : mriScanUrl
                           ? "Hide scan"
                           : "View scan"}
                     </button>
-                    {mriFile ? (
-                      <a
-                        className="button-quiet"
-                        href={mriFile.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Download
-                      </a>
-                    ) : null}
+                    <button
+                      type="button"
+                      className="button-quiet"
+                      onClick={downloadMri}
+                      disabled={mriDownloading}
+                    >
+                      {mriDownloading ? "Preparing…" : "Download"}
+                    </button>
                   </div>
                 ) : null}
-                {mriFileError ? (
+                {mriError ? (
                   <p className="visit-note no-print">
-                    {mriFileError}{" "}
-                    <button type="button" className="link-button" onClick={openMri}>
+                    {mriError}{" "}
+                    <button type="button" className="link-button" onClick={toggleMri}>
                       Try again
                     </button>
                   </p>
@@ -340,19 +366,20 @@ export default function VisitDetail() {
               <dd>
                 {MODALITY_LABELS[visit.speech_status] ?? visit.speech_status}
                 {visit.speech_status === "done" ? (
-                  speechFile ? (
+                  speechUrl ? (
                     <audio
                       className="visit-audio no-print"
                       controls
-                      src={speechFile.url}
+                      preload="metadata"
+                      src={speechUrl}
                     />
-                  ) : speechFileError ? (
+                  ) : speechError ? (
                     <p className="visit-note no-print">
-                      Couldn’t load the recording (the link may have expired).{" "}
+                      Couldn’t load the recording.{" "}
                       <button
                         type="button"
                         className="link-button"
-                        onClick={retrySpeechFile}
+                        onClick={retrySpeech}
                       >
                         Try again
                       </button>
@@ -365,11 +392,11 @@ export default function VisitDetail() {
             </div>
           </dl>
 
-          {mriFile ? (
+          {mriScanUrl ? (
             <Suspense
               fallback={<p className="visit-note no-print">Loading viewer…</p>}
             >
-              <ScanViewer url={mriFile.url} filename={mriFile.filename} />
+              <ScanViewer url={mriScanUrl} filename="scan.nii.gz" />
             </Suspense>
           ) : null}
 

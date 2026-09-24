@@ -10,7 +10,7 @@ import mimetypes
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 from supabase import create_client
 
@@ -25,7 +25,9 @@ from app.deps import (
 )
 from app.models import DiagnosisHistory, Patient, Visit
 from app.schemas import DiagnosisCreate, VisitCreate, VisitDetailOut, VisitFileOut
+from app.services.audio_view import PLAYER_FILENAME, PLAYER_MEDIA_TYPE, to_playable_mp3
 from app.services.audit import record_audit
+from app.services.scan_view import VIEWER_FILENAME, VIEWER_MEDIA_TYPE, to_viewer_nifti
 from app.services.visit_logic import decide_visit_type
 
 router = APIRouter(prefix="/visits", tags=["visits"])
@@ -134,6 +136,40 @@ _FILE_KINDS = {
 }
 
 
+def _uploads_bucket():
+    return create_client(
+        settings.SUPABASE_URL, settings.SUPABASE_KEY
+    ).storage.from_(settings.SUPABASE_BUCKET)
+
+
+def _resolve_object_path(bucket, visit: Visit, kind: str) -> str:
+    """The storage key for a visit's ``kind`` upload, or 404.
+
+    Falls back to listing the folder for rows uploaded before migration 005
+    recorded the path.
+    """
+    status_attr, path_attr, _ = _FILE_KINDS[kind]
+    if getattr(visit, status_attr) != "done":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No {kind} file for this visit",
+        )
+    object_path = getattr(visit, path_attr)
+    if object_path:
+        return object_path
+    try:
+        entries = bucket.list(f"{kind}/{visit.id}")
+    except Exception:  # noqa: BLE001 - any storage error means "not found"
+        entries = []
+    names = [e["name"] for e in entries if e.get("name")]
+    if not names:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"{kind} file not found in storage",
+        )
+    return f"{kind}/{visit.id}/{names[0]}"
+
+
 @router.get("/{visit_id}/file/{kind}", response_model=VisitFileOut)
 def get_visit_file(
     visit_id: uuid.UUID,
@@ -145,41 +181,19 @@ def get_visit_file(
 
     Any signed-in user at the visit's hospital may fetch it — the clinician
     needs it to review, the receptionist to confirm the upload. The bucket is
-    private, so the URL is minted per request and expires in an hour.
+    private, so the URL is minted per request and expires in an hour. This
+    returns the file *as uploaded* (e.g. a `.dcm`); the in-browser viewer uses
+    ``/scan`` instead, which normalises to NIfTI.
     """
-    spec = _FILE_KINDS.get(kind)
-    if spec is None:
+    if kind not in _FILE_KINDS:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Unknown file kind"
         )
-    status_attr, path_attr, force_download = spec
+    _, _, force_download = _FILE_KINDS[kind]
 
     visit = _load_scoped_visit(db, user, visit_id)
-    if getattr(visit, status_attr) != "done":
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No {kind} file for this visit",
-        )
-
-    bucket = create_client(
-        settings.SUPABASE_URL, settings.SUPABASE_KEY
-    ).storage.from_(settings.SUPABASE_BUCKET)
-
-    object_path = getattr(visit, path_attr)
-    if not object_path:
-        # Rows uploaded before migration 005 didn't record the path — recover it
-        # by listing the visit's folder.
-        try:
-            entries = bucket.list(f"{kind}/{visit_id}")
-        except Exception:  # noqa: BLE001 - treat any storage error as "not found"
-            entries = []
-        names = [e["name"] for e in entries if e.get("name")]
-        if not names:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"{kind} file not found in storage",
-            )
-        object_path = f"{kind}/{visit_id}/{names[0]}"
+    bucket = _uploads_bucket()
+    object_path = _resolve_object_path(bucket, visit, kind)
 
     filename = object_path.rsplit("/", 1)[-1]
     options = {"download": filename} if force_download else None
@@ -203,6 +217,83 @@ def get_visit_file(
 
     content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
     return VisitFileOut(url=url, filename=filename, content_type=content_type)
+
+
+@router.get("/{visit_id}/scan")
+def get_visit_scan(
+    visit_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+) -> Response:
+    """The MRI scan as gzip-compressed NIfTI, for the in-browser viewer.
+
+    Streamed through the app (not a signed URL) because the browser viewer
+    can't attach an auth header, and because a `.dcm` upload has to be decoded
+    to NIfTI server-side — Niivue has no DICOM reader.
+    """
+    visit = _load_scoped_visit(db, user, visit_id)
+    bucket = _uploads_bucket()
+    object_path = _resolve_object_path(bucket, visit, "mri")
+    filename = object_path.rsplit("/", 1)[-1]
+
+    try:
+        raw = bucket.download(object_path)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not read the scan from storage.",
+        ) from exc
+
+    try:
+        nifti = to_viewer_nifti(raw, filename)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail=str(exc)
+        ) from exc
+
+    return Response(
+        content=nifti,
+        media_type=VIEWER_MEDIA_TYPE,
+        headers={"Content-Disposition": f'inline; filename="{VIEWER_FILENAME}"'},
+    )
+
+
+@router.get("/{visit_id}/audio")
+def get_visit_audio(
+    visit_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+) -> Response:
+    """The speech recording as MP3, for the review screen's audio player.
+
+    Transcoded because a browser MediaRecorder produces WebM/Opus, which
+    doesn't play in every browser and often has no duration metadata.
+    """
+    visit = _load_scoped_visit(db, user, visit_id)
+    bucket = _uploads_bucket()
+    object_path = _resolve_object_path(bucket, visit, "speech")
+    filename = object_path.rsplit("/", 1)[-1]
+
+    try:
+        raw = bucket.download(object_path)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not read the recording from storage.",
+        ) from exc
+
+    try:
+        mp3 = to_playable_mp3(raw, filename)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
+        ) from exc
+
+    return Response(
+        content=mp3,
+        media_type=PLAYER_MEDIA_TYPE,
+        headers={"Content-Disposition": f'inline; filename="{PLAYER_FILENAME}"'},
+    )
 
 
 @router.post("/{visit_id}/diagnosis", response_model=VisitDetailOut)

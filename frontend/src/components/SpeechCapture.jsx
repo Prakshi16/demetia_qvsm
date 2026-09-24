@@ -40,6 +40,7 @@ export default function SpeechCapture({ visitId, onDone }) {
   const [status, setStatus] = useState(STATUS.IDLE);
   const [timer, setTimer] = useState(0);
   const [error, setError] = useState("");
+  const [micWarning, setMicWarning] = useState("");
   const [fileName, setFileName] = useState("");
   const [waveform, setWaveform] = useState(
     Array.from({ length: 32 }, () => 8)
@@ -52,6 +53,9 @@ export default function SpeechCapture({ visitId, onDone }) {
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const animationRef = useRef(null);
+  // Set when the user cancels mid-recording so recorder.onstop drops the take
+  // instead of uploading it.
+  const discardedRef = useRef(false);
 
   const inputId = `speech-upload-${String(visitId || "new").replace(
     /[^a-zA-Z0-9_-]/g,
@@ -110,9 +114,16 @@ export default function SpeechCapture({ visitId, onDone }) {
       }
 
       const audioContext = new AudioContext();
+      // Browsers create an AudioContext in "suspended" state unless it's inside
+      // a user gesture; by the time we get here getUserMedia has already
+      // awaited, so resume it explicitly or the analyser only ever reads zeros.
+      if (audioContext.state === "suspended") {
+        audioContext.resume().catch(() => {});
+      }
       const analyser = audioContext.createAnalyser();
 
-      analyser.fftSize = 64;
+      analyser.fftSize = 128;
+      analyser.smoothingTimeConstant = 0.6;
 
       const source = audioContext.createMediaStreamSource(stream);
       source.connect(analyser);
@@ -121,6 +132,8 @@ export default function SpeechCapture({ visitId, onDone }) {
       analyserRef.current = analyser;
 
       const data = new Uint8Array(analyser.frequencyBinCount);
+      let framesSeen = 0;
+      let peakSeen = 0;
 
       function draw() {
         if (!analyserRef.current) {
@@ -129,12 +142,26 @@ export default function SpeechCapture({ visitId, onDone }) {
 
         analyser.getByteFrequencyData(data);
 
+        let frameMax = 0;
         const bars = Array.from({ length: 32 }, (_, index) => {
           const value = data[index % data.length] || 0;
+          if (value > frameMax) frameMax = value;
           return Math.max(6, Math.round(value / 4));
         });
-
         setWaveform(bars);
+
+        // If ~2s in nothing has registered, the mic is delivering silence —
+        // recording will produce an inaudible file, so say so now.
+        peakSeen = Math.max(peakSeen, frameMax);
+        framesSeen += 1;
+        if (framesSeen === 120 && peakSeen < 4) {
+          setMicWarning(
+            "No sound is reaching the microphone. Check your system input " +
+              "device and that another app (Zoom, Teams, …) isn’t using it, " +
+              "then cancel and re-record.",
+          );
+        }
+
         animationRef.current = requestAnimationFrame(draw);
       }
 
@@ -221,6 +248,7 @@ export default function SpeechCapture({ visitId, onDone }) {
 
   async function startRecording() {
     setError("");
+    setMicWarning("");
 
     if (!visitId) {
       setError("A visit ID is required before recording speech.");
@@ -239,11 +267,36 @@ export default function SpeechCapture({ visitId, onDone }) {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       });
 
       streamRef.current = stream;
       chunksRef.current = [];
+
+      // Surfaces which mic the browser actually chose — invaluable when a
+      // recording comes out silent (wrong default device is the usual cause).
+      const track = stream.getAudioTracks()[0];
+      if (track) {
+        // eslint-disable-next-line no-console
+        console.info(
+          "[SpeechCapture] mic:",
+          track.label || "(unnamed)",
+          "| muted:",
+          track.muted,
+          "| enabled:",
+          track.enabled,
+          track.getSettings?.() ?? {},
+        );
+        if (track.muted) {
+          setMicWarning(
+            "The selected microphone is muted at the system level.",
+          );
+        }
+      }
 
       const mimeTypes = [
         "audio/webm;codecs=opus",
@@ -271,6 +324,15 @@ export default function SpeechCapture({ visitId, onDone }) {
         stopTimer();
         stopWaveform();
         stopTracks();
+
+        // Cancelled mid-take: bin the audio, back to the start.
+        if (discardedRef.current) {
+          discardedRef.current = false;
+          chunksRef.current = [];
+          setTimer(0);
+          setStatus(STATUS.IDLE);
+          return;
+        }
 
         const mimeType = recorder.mimeType || "audio/webm";
 
@@ -328,6 +390,27 @@ export default function SpeechCapture({ visitId, onDone }) {
     }
   }
 
+  // Discard the current take without uploading — for when the patient fumbles a
+  // word and wants to start over.
+  function cancelRecording() {
+    setError("");
+    setMicWarning("");
+    const recorder = mediaRecorderRef.current;
+
+    if (recorder && recorder.state !== "inactive") {
+      discardedRef.current = true;
+      recorder.stop(); // onstop sees the flag and resets instead of uploading
+      return;
+    }
+
+    stopTimer();
+    stopWaveform();
+    stopTracks();
+    chunksRef.current = [];
+    setTimer(0);
+    setStatus(STATUS.IDLE);
+  }
+
   function handleFileChange(event) {
     const file = event.target.files?.[0];
 
@@ -350,6 +433,7 @@ export default function SpeechCapture({ visitId, onDone }) {
     setTimer(0);
     setFileName("");
     setError("");
+    setMicWarning("");
   }
 
   return (
@@ -416,13 +500,28 @@ export default function SpeechCapture({ visitId, onDone }) {
               ))}
             </div>
 
-            <button
-              type="button"
-              className="speech-capture__stop-button"
-              onClick={stopRecording}
-            >
-              ■ Stop Recording
-            </button>
+            {micWarning && (
+              <p className="speech-capture__warning" role="alert">
+                {micWarning}
+              </p>
+            )}
+
+            <div className="speech-capture__actions">
+              <button
+                type="button"
+                className="speech-capture__stop-button"
+                onClick={stopRecording}
+              >
+                ■ Stop &amp; use
+              </button>
+              <button
+                type="button"
+                className="speech-capture__cancel-button"
+                onClick={cancelRecording}
+              >
+                Cancel &amp; re-record
+              </button>
+            </div>
           </>
         )}
 
@@ -504,6 +603,7 @@ const styles = `
 
 .speech-capture__record-button,
 .speech-capture__stop-button,
+.speech-capture__cancel-button,
 .speech-capture__upload,
 .speech-capture__reset {
   width: 100%;
@@ -515,6 +615,21 @@ const styles = `
   cursor: pointer;
   text-align: center;
   box-sizing: border-box;
+}
+
+.speech-capture__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.speech-capture__cancel-button {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.speech-capture__cancel-button:hover {
+  background: #cbd5e1;
 }
 
 .speech-capture__record-button {
@@ -634,6 +749,16 @@ const styles = `
   margin: 1rem 0 0;
   color: #b91c1c;
   font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.speech-capture__warning {
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.85rem;
   line-height: 1.45;
 }
 `;
