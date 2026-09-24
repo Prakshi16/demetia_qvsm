@@ -31,7 +31,10 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # nothing and means a deployed instance has no external model dependency —
 # without this /health reports model:"error" in production, because the
 # docker-compose bind mount that supplies them in dev does not exist on Render.
-COPY results/qsvm_model.pkl results/svm_model.pkl /model/
+# mri_extractor_calibration.pkl (2026-09-25) is optional at runtime -- mri_features.py
+# falls back to the raw heuristic if it's missing -- but bake it in anyway so a fresh
+# deploy gets the calibrated MRI extraction by default.
+COPY results/qsvm_model.pkl results/svm_model.pkl results/mri_extractor_calibration.pkl /model/
 
 # App code. In dev this is shadowed by the docker-compose bind mount; in a real
 # build (Render) it's the actual source.

@@ -1,16 +1,37 @@
 from __future__ import annotations
 
 import math
+import pickle
 import shutil
 import tempfile
+from functools import lru_cache
 from pathlib import Path
 from typing import BinaryIO, Protocol
+
+from app.config import settings
 
 
 MRI_FEATURE_ORDER: tuple[str, str] = (
     "nWBV",
     "eTIV",
 )
+
+# Feature vector shared between the live extractor and scripts/calibrate_mri_extractor.py --
+# order matters, both sides must build it identically (see compute_calibration_features).
+CALIBRATION_FEATURE_NAMES: tuple[str, ...] = (
+    "icv_ml",
+    "brain_ml",
+    "nwbv_heuristic",
+    "vol_ratio_p30",
+    "vol_ratio_p40",
+    "vol_ratio_p50",
+    "vol_ratio_p60",
+    "vol_ratio_p70",
+    "foreground_mean",
+    "foreground_std",
+)
+
+CALIBRATION_PICKLE = "mri_extractor_calibration.pkl"
 
 
 class UploadFileLike(Protocol):
@@ -56,10 +77,16 @@ def extract_mri_features(file: UploadFileLike) -> list[float]:
 
     Important:
     This is a lightweight demo extractor written from scratch so Bishal's upload module
-    works end-to-end. It estimates proxy values from MRI voxel data using intensity
-    thresholding and geometric heuristics. These proxies are not a substitute for a
-    validated neuroimaging pipeline such as FreeSurfer, FSL, ANTs, or the real Phase 1
-    preprocessing code.
+    works end-to-end -- intensity thresholding and geometric heuristics, not a real
+    neuroimaging pipeline (FreeSurfer/FSL/ANTs). **2026-09-25:** its raw output used to be
+    served directly and was found to badly compress real atrophy differences (three real
+    OASIS subjects with true nWBV 0.83/0.76/0.67 all extracted to ~0.85-0.88, flipping
+    predictions). It's now calibrated: the same heuristic masks feed a small Ridge regression
+    fit against 39 real OASIS-1 scans' true nWBV/eTIV (`scripts/calibrate_mri_extractor.py`,
+    LOOCV-validated, stats in the loaded pickle). Still a proxy, not real segmentation --
+    the calibration is bounded by a 39-subject fit, and the model falls back to the raw
+    heuristic if `results/mri_extractor_calibration.pkl` isn't present. See
+    `PROJECT_CONTEXT.md` for the LOOCV numbers and the diagnosis that led here.
 
     Replace this implementation before using the app for research conclusions or
     clinical decision support.
@@ -67,15 +94,17 @@ def extract_mri_features(file: UploadFileLike) -> list[float]:
 
     volume, voxel_volume_mm3 = _load_uploaded_volume(file)
     normalized_volume = _normalize_volume(volume)
-    intracranial_mask = _estimate_intracranial_mask(normalized_volume)
-    brain_mask = _estimate_brain_mask(normalized_volume, intracranial_mask)
+    features = compute_calibration_features(normalized_volume, voxel_volume_mm3)
 
-    if intracranial_mask.sum() == 0 or brain_mask.sum() == 0:
-        raise MriFeatureExtractionError("Unable to segment MRI foreground from uploaded file.")
-
-    etiv_ml = _volume_ml(intracranial_mask, voxel_volume_mm3)
-    brain_volume_ml = _volume_ml(brain_mask, voxel_volume_mm3)
-    nwbv = _clamp(brain_volume_ml / etiv_ml, 0.35, 0.95)
+    calibration = _load_calibration()
+    if calibration is not None:
+        x = [calibration_feature_vector(features)]
+        nwbv = _clamp(float(calibration["nwbv_model"].predict(x)[0]), 0.35, 0.95)
+        etiv_ml = max(float(calibration["etiv_model"].predict(x)[0]), 1.0)
+    else:
+        # No calibration pickle on disk -- fall back to the raw heuristic rather than fail.
+        nwbv = _clamp(features["nwbv_heuristic"], 0.35, 0.95)
+        etiv_ml = features["icv_ml"]
 
     return validate_mri_feature_vector(
         [
@@ -83,6 +112,87 @@ def extract_mri_features(file: UploadFileLike) -> list[float]:
             round(etiv_ml, 2),
         ]
     )
+
+
+def compute_calibration_features(normalized_volume: "object", voxel_volume_mm3: float) -> dict[str, float]:
+    """The feature vector shared by the live extractor and the calibration script.
+
+    Pure function (normalized volume in, features out) so calibration-fit time and serving time
+    always compute it identically -- the same "verbatim shared function" pattern
+    scripts/speech_03_window_features.py uses for extract_speech_features. Order of
+    CALIBRATION_FEATURE_NAMES is the contract; calibration_feature_vector() enforces it.
+    """
+    import numpy as np
+
+    intracranial_mask = _estimate_intracranial_mask(normalized_volume)
+    brain_mask = _estimate_brain_mask(normalized_volume, intracranial_mask)
+
+    if intracranial_mask.sum() == 0:
+        raise MriFeatureExtractionError("Unable to segment MRI foreground from uploaded file.")
+
+    icv_ml = _volume_ml(intracranial_mask, voxel_volume_mm3)
+    brain_ml = _volume_ml(brain_mask, voxel_volume_mm3) if brain_mask.sum() else 0.0
+    nwbv_heuristic = brain_ml / icv_ml if icv_ml > 0 else 0.0
+
+    foreground = normalized_volume[intracranial_mask]
+    features: dict[str, float] = {
+        "icv_ml": icv_ml,
+        "brain_ml": brain_ml,
+        "nwbv_heuristic": nwbv_heuristic,
+        "foreground_mean": float(foreground.mean()),
+        "foreground_std": float(foreground.std()),
+    }
+    for p in (30, 40, 50, 60, 70):
+        cutoff = np.percentile(foreground, p)
+        mask_p = intracranial_mask & (normalized_volume >= cutoff)
+        vol_p_ml = _volume_ml(mask_p, voxel_volume_mm3)
+        features[f"vol_ratio_p{p}"] = vol_p_ml / icv_ml if icv_ml > 0 else 0.0
+
+    return features
+
+
+def calibration_feature_vector(features: dict[str, float]) -> list[float]:
+    """features dict -> ordered list matching CALIBRATION_FEATURE_NAMES."""
+    return [features[name] for name in CALIBRATION_FEATURE_NAMES]
+
+
+def extract_calibration_features_from_path(path: Path) -> dict[str, float]:
+    """Load a scan directly from a local filesystem path (no upload wrapper, no tempfile hop)
+    and compute the shared calibration feature vector. Used by
+    scripts/calibrate_mri_extractor.py, which reads real OASIS files directly rather than
+    through the FastAPI upload path.
+    """
+    lowered = str(path).lower()
+    if lowered.endswith((".nii", ".nii.gz", ".mgh", ".mgz", ".img", ".hdr")):
+        volume, voxel_volume_mm3 = _load_nifti_like_volume(path)
+    elif lowered.endswith((".dcm", ".dicom")):
+        volume, voxel_volume_mm3 = _load_dicom_volume(path)
+    else:
+        raise MriFeatureExtractionError(f"Unsupported MRI file format: {path}")
+
+    normalized_volume = _normalize_volume(volume)
+    return compute_calibration_features(normalized_volume, voxel_volume_mm3)
+
+
+def _calibration_dir() -> Path:
+    """Where the calibration pickle lives -- mirrors prediction.py's _model_dir()."""
+    configured = Path(settings.MODEL_DIR)
+    if (configured / CALIBRATION_PICKLE).exists():
+        return configured
+    return Path(__file__).resolve().parents[3] / "results"
+
+
+@lru_cache(maxsize=1)
+def _load_calibration() -> dict[str, object] | None:
+    """Load the fitted nWBV/eTIV regressors once. Cached. Returns None (not an error) if the
+    pickle isn't present, so a missing calibration artifact degrades to the old raw heuristic
+    rather than taking MRI upload down.
+    """
+    path = _calibration_dir() / CALIBRATION_PICKLE
+    if not path.exists():
+        return None
+    with path.open("rb") as handle:
+        return pickle.load(handle)
 
 
 def _load_uploaded_volume(file: UploadFileLike) -> tuple["object", float]:
@@ -280,8 +390,12 @@ def _clamp(value: float, minimum: float, maximum: float) -> float:
 
 __all__ = [
     "MRI_FEATURE_ORDER",
+    "CALIBRATION_FEATURE_NAMES",
     "MriFeatureExtractionError",
     "MriFeatureExtractionNotReady",
     "extract_mri_features",
     "validate_mri_feature_vector",
+    "compute_calibration_features",
+    "calibration_feature_vector",
+    "extract_calibration_features_from_path",
 ]

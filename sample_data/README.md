@@ -36,7 +36,14 @@ the live screening flow any more.
 Pick one MRI + one audio, any format. These files are still synthetic phantoms (intensity/geometry
 shapes and tone bursts, not real anatomy or speech — see the note at the top), so their exact
 `nWBV`/`eTIV` values sit well outside the OASIS training range and don't have a principled
-"should be higher/lower for dementia" ordering the way a real scan would.
+"should be higher/lower for dementia" ordering the way a real scan would. **2026-09-25:** the MRI
+extractor was calibrated against 39 real OASIS-1 scans (`PROJECT_CONTEXT.md` §31) — it now handles
+*real* anatomy well (see `results/mri_extractor_calibration.pkl`'s LOOCV numbers), but these
+geometric phantoms are exactly the kind of far-out-of-distribution input the calibration wasn't fit
+to, so their behavior is unverified either way. **Prefer real scans for a demo** — see
+`data/oasis1_MRI_scans/` for real, already-uploadable-after-conversion OASIS-1 subjects (convert
+`.img`→`.nii.gz` with `nibabel`; `PROJECT_CONTEXT.md` §31.3 has three verified real
+Nondemented/Borderline/Demented cases with their true `nWBV` values).
 
 **Margins below are not re-verified against the retrained model** (2026-09-24: both the Docker
 image build and the local `librosa`/`numba` speech path were blocked in the environment this

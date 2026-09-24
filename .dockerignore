@@ -8,10 +8,11 @@ notebooks/
 *.ipynb
 .ipynb_checkpoints/
 
-# Everything in results/ except the two pickles the Dockerfile copies.
+# Everything in results/ except the pickles the Dockerfile copies.
 results/*
 !results/qsvm_model.pkl
 !results/svm_model.pkl
+!results/mri_extractor_calibration.pkl
 
 # The frontend is deployed separately (Vercel/Netlify), not from this image.
 frontend/
