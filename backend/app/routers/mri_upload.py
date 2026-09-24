@@ -4,6 +4,11 @@ MRI upload endpoint.
 Uploads an MRI scan, stores it in Supabase Storage, extracts the 2-feature
 MRI vector, saves it to the visit, and triggers prediction if both modalities
 are complete.
+
+Re-upload is allowed (e.g. the receptionist picked the wrong file) any time before a
+diagnosis has been saved -- this simply overwrites the stored feature vector; if a
+prediction had already fired on the old (wrong) file, it's cleared and recomputed from
+the corrected one. Once the visit is `reviewed`, re-upload is refused outright.
 """
 
 from __future__ import annotations
@@ -24,7 +29,7 @@ from app.services.mri_features import (
     extract_mri_features,
     validate_mri_feature_vector,
 )
-from app.services.prediction import check_and_run_prediction
+from app.services.prediction import check_and_run_prediction, clear_stale_prediction
 
 router = APIRouter(prefix="/visits", tags=["MRI Upload"])
 
@@ -103,6 +108,12 @@ async def upload_mri(
             detail="MRI upload is only allowed for screening visits",
         )
 
+    if visit.status == "reviewed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Diagnosis already saved for this visit; re-upload is not allowed.",
+        )
+
     _validate_upload(file)
 
     file_bytes = await file.read()
@@ -141,6 +152,11 @@ async def upload_mri(
     visit.mri_feature_vector = features
     visit.mri_object_path = storage_path
     visit.mri_status = "done"
+
+    if visit.model_prediction is not None:
+        # Re-upload after a prediction already fired (§ receptionist picked the wrong file
+        # the first time) -- clear it so it recomputes from the corrected MRI below.
+        clear_stale_prediction(visit)
 
     check_and_run_prediction(db, visit)
 

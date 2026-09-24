@@ -55,6 +55,11 @@ export default function NewVisitScreening() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [formError, setFormError] = useState("");
+  // Re-showing the upload widget for a modality that's already "done", so a
+  // receptionist who picked the wrong file can replace it. Reset back to false
+  // once the replacement upload succeeds (handleUploadDone below).
+  const [replacingMri, setReplacingMri] = useState(false);
+  const [replacingSpeech, setReplacingSpeech] = useState(false);
 
   // Load the patient, and the in-progress visit if we were sent back to finish
   // one. Both are read-only lookups, so a failure here is fatal to the screen
@@ -168,6 +173,9 @@ export default function NewVisitScreening() {
   const mriDone = visit?.mri_status === "done";
   const speechDone = visit?.speech_status === "done";
   const hasPrediction = Boolean(visit?.model_prediction);
+  // Matches the backend guard in mri_upload.py/speech.py: once a diagnosis is saved,
+  // re-upload is refused outright, so don't offer "Replace file" past that point.
+  const canReplaceUploads = visit?.status !== "reviewed";
 
   return (
     <div className="page visit-page">
@@ -319,19 +327,53 @@ export default function NewVisitScreening() {
           <div className="visit-uploads">
             <div className="visit-upload-slot">
               <h3>MRI scan</h3>
-              {mriDone ? (
-                <p className="visit-done">Features extracted ✓</p>
+              {mriDone && !replacingMri ? (
+                <div className="visit-done-row">
+                  <p className="visit-done">Features extracted ✓</p>
+                  {canReplaceUploads ? (
+                    <button
+                      type="button"
+                      className="button-quiet"
+                      onClick={() => setReplacingMri(true)}
+                    >
+                      Wrong file? Replace
+                    </button>
+                  ) : null}
+                </div>
               ) : (
-                <MriUpload visitId={visit.id} onDone={handleUploadDone} />
+                <MriUpload
+                  visitId={visit.id}
+                  onDone={(updated) => {
+                    handleUploadDone(updated);
+                    setReplacingMri(false);
+                  }}
+                />
               )}
             </div>
 
             <div className="visit-upload-slot">
               <h3>Speech recording</h3>
-              {speechDone ? (
-                <p className="visit-done">Features extracted ✓</p>
+              {speechDone && !replacingSpeech ? (
+                <div className="visit-done-row">
+                  <p className="visit-done">Features extracted ✓</p>
+                  {canReplaceUploads ? (
+                    <button
+                      type="button"
+                      className="button-quiet"
+                      onClick={() => setReplacingSpeech(true)}
+                    >
+                      Wrong file? Replace
+                    </button>
+                  ) : null}
+                </div>
               ) : (
-                <SpeechCapture visitId={visit.id} onDone={handleUploadDone} />
+                <SpeechCapture
+                  visitId={visit.id}
+                  onDone={(updated) => {
+                    handleUploadDone(updated);
+                    setReplacingSpeech(false);
+                  }}
+                />
               )}
             </div>
           </div>

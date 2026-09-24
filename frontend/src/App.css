@@ -432,6 +432,19 @@
   font-weight: 700;
 }
 
+/* "Wrong file? Replace" sits next to the done state, not inside it — replacing
+   isn't part of the success message. */
+.visit-done-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.visit-done-row .visit-done {
+  flex: 1 1 auto;
+}
+
 .visit-card--result {
   border-color: var(--accent);
 }

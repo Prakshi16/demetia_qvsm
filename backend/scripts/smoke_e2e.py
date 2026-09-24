@@ -52,12 +52,17 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 # Synthetic inputs. Dummy data only, per the project's standing rule.
 # ---------------------------------------------------------------------------
 
-def make_nifti() -> bytes:
+def make_nifti(inner_radius: float = 16.0) -> bytes:
     """A brain-ish volume: a bright core inside a dimmer intracranial shell.
 
     The extractor is an intensity/geometry proxy, so this gives it the contrast
     it looks for. The resulting eTIV is far outside the OASIS training range —
     that is the synthetic phantom, not a bug.
+
+    inner_radius shrinks/grows the bright core (default 16, same as always) —
+    used by the re-upload check below to produce a visibly different feature
+    vector from the default call, so "the vector actually changed" is a real
+    assertion, not just "the request succeeded."
     """
     rng = np.random.default_rng(7)
     grid = np.mgrid[:48, :48, :48].astype(np.float32)
@@ -66,7 +71,7 @@ def make_nifti() -> bytes:
 
     volume = np.zeros((48, 48, 48), dtype=np.float32)
     volume[radius < 20] = 0.45
-    volume[radius < 16] = 0.85
+    volume[radius < inner_radius] = 0.85
     volume = np.clip(volume + rng.normal(0, 0.02, volume.shape).astype(np.float32), 0, 1)
 
     image = nib.Nifti1Image(volume, affine=np.diag([1.5, 1.5, 1.5, 1.0]))
@@ -355,6 +360,26 @@ def run(client: httpx.Client) -> None:
     check("prediction is persisted, not just echoed",
           persisted["model_prediction"] == model_says)
 
+    # -- re-upload: the receptionist picked the wrong file the first time -----
+    # Still pending_review (no diagnosis saved yet) -- re-upload must be accepted,
+    # overwrite the feature vector, and recompute the prediction from it.
+    before_mri_vector = persisted["mri_feature_vector"]
+    response = client.post(f"{BASE}/visits/{visit_id}/mri-upload", headers=desk,
+                           files={"file": ("s2.nii.gz", make_nifti(inner_radius=8.0), "application/gzip")})
+    check("re-upload before a diagnosis is saved -> 200, not rejected",
+          response.status_code == 200, str(response.status_code))
+    after_reupload = response.json()
+    check("re-upload overwrites the feature vector",
+          after_reupload["mri_feature_vector"] != before_mri_vector,
+          f"{before_mri_vector} -> {after_reupload['mri_feature_vector']}")
+    check("re-upload recomputes the prediction (still present, status back to pending_review)",
+          after_reupload["model_prediction"] is not None
+          and after_reupload["status"] == "pending_review",
+          f"{after_reupload['model_prediction']} / {after_reupload['status']}")
+    # The re-upload may have flipped the label (different phantom) -- resync model_says
+    # so the rest of the flow (the mismatch path below) uses the current prediction.
+    model_says = after_reupload["model_prediction"]
+
     # -- the clinician can pull the raw scan / recording back -------------
     for kind in ("mri", "speech"):
         r = client.get(f"{BASE}/visits/{visit_id}/file/{kind}", headers=doctor)
@@ -419,6 +444,13 @@ def run(client: httpx.Client) -> None:
         check("the rejected no-op wrote no history row",
               len(hist.get("diagnosis_history") or []) == 2,
               str(len(hist.get("diagnosis_history") or [])))
+
+    # -- re-upload after the diagnosis is saved must now be refused ----------
+    response = client.post(f"{BASE}/visits/{visit_id}/mri-upload", headers=desk,
+                           files={"file": ("s3.nii.gz", make_nifti(inner_radius=12.0), "application/gzip")})
+    check("re-upload after a diagnosis is saved -> 400, not silently accepted",
+          response.status_code == 400 and "already saved" in response.text,
+          f"{response.status_code} {response.text[:120]}")
 
     # -- follow-up ---------------------------------------------------------
     decision = client.get(f"{BASE}/patients/{patient_id}/next-visit-type",

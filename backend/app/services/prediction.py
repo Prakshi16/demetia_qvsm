@@ -215,6 +215,23 @@ def _predict_with(pipeline: object, row: list[float]) -> tuple[str, float]:
     return label, abs(margin)
 
 
+def clear_stale_prediction(visit: Visit) -> None:
+    """Clear a previously-computed prediction so a corrected re-upload recomputes it.
+
+    Called by mri_upload.py / speech.py, right before check_and_run_prediction, when a
+    receptionist re-uploads MRI or speech after a prediction already fired (e.g. the wrong
+    file was picked the first time). Without this, check_and_run_prediction's own guard
+    ("already predicted, don't re-run") would silently leave the stale prediction in place
+    even though the underlying evidence just changed. The router is responsible for refusing
+    this once a diagnosis has been saved (visit.status == "reviewed") -- this function doesn't
+    check that itself, it only clears fields.
+    """
+    visit.model_prediction = None
+    visit.model_confidence = None
+    visit.svm_prediction = None
+    visit.svm_confidence = None
+
+
 def check_and_run_prediction(db: Session, visit: Visit) -> bool:
     """If the screening visit is data-complete, run the model and advance it.
 
