@@ -332,9 +332,12 @@ class VisitDetailOut(BaseModel):
     speech_status: str
     mri_feature_vector: Optional[list] = None
     speech_feature_vector: Optional[list] = None
-    model_prediction: Optional[str] = None  # QSVM ("Quantum SVM")
+    model_prediction: Optional[str] = None  # classical SVM (2026-09-25 -- see prediction.py)
     model_confidence: Optional[float] = None
-    svm_prediction: Optional[str] = None  # classical SVM, display-only comparison
+    # Legacy QSVM comparison columns. No longer written for new predictions
+    # (see the 2026-09-25 note in prediction.py); kept for visits predicted
+    # before that date and for schema/DB backward compatibility.
+    svm_prediction: Optional[str] = None
     svm_confidence: Optional[float] = None
     requires_review: bool
     status: str

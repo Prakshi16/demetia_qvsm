@@ -347,9 +347,9 @@ def run(client: httpx.Client) -> None:
     check("both modalities in -> prediction appears, status pending_review",
           after_speech["status"] == "pending_review" and model_says is not None,
           f"{model_says} margin={after_speech['model_confidence']}")
-    check("classical SVM comparison present too",
-          after_speech["svm_prediction"] is not None,
-          f"{after_speech['svm_prediction']} margin={after_speech['svm_confidence']}")
+    check("legacy svm_prediction column stays unset (SVM result lives in model_prediction now)",
+          after_speech["svm_prediction"] is None,
+          f"{after_speech['svm_prediction']}")
 
     persisted = client.get(f"{BASE}/visits/{visit_id}", headers=desk).json()
     check("prediction is persisted, not just echoed",

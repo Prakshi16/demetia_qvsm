@@ -1,4 +1,4 @@
-"""Model-serving seam for the fused QSVM prediction.
+"""Model-serving seam for the fused classical-SVM prediction.
 
 ``check_and_run_prediction`` is the exact function Bishal's MRI upload and
 Sheetal's speech upload endpoints call at the very end of their handlers, once
@@ -6,26 +6,40 @@ they've stored their feature vector and set their modality status to ``done``.
 When BOTH modalities are done it runs the fused pipeline and moves the visit into
 the clinician's queue (``status='pending_review'``).
 
-Two predictions are produced: the QSVM ("Quantum SVM") result on
-``model_prediction``/``model_confidence`` (the canonical one — agreement_flag
-compares the doctor against it), and a classical SVM result on
-``svm_prediction``/``svm_confidence``, shown alongside it purely for
-research/comparison. The classical SVM feeds no computed field.
+**2026-09-25 — QSVM removed from serving (decision, not an oversight).** The
+app used to run both the QSVM and a classical SVM and show them side by side,
+with the QSVM as canonical (``agreement_flag`` compared the doctor against it).
+On the real-data retrain (``real_dataset_setup.md`` / ``results/metrics_full.json``,
+5-fold ``GroupKFold``, fused), the classical SVM beat the QSVM on every metric
+but specificity — accuracy 81.1% vs 78.1%, F1 83.4% vs 79.9%, and ROC-AUC 90.8%
+vs 84.5% (the biggest gap, meaning its confidence ranking is meaningfully more
+trustworthy, not just its hard label) — and sensitivity 85.9% vs 79.4%, which
+matters more for a screening tool since missing a real case is the costlier
+error. So the app now loads and runs **only** the classical SVM, and its result
+fills ``model_prediction``/``model_confidence`` (the field ``agreement_flag``
+compares the doctor against). ``svm_prediction``/``svm_confidence`` are no
+longer populated for new predictions — the historical QSVM comparison columns
+stay in the schema for old visits, they just aren't written to any more.
+**The QSVM is not deleted from the project** — ``multimodal_qsvm.ipynb`` and
+``metrics_full.ipynb`` still train and evaluate it for the capstone's honest
+"does the quantum kernel help?" comparison; this file is the one place that
+stopped calling it in the live product.
 
 =============================================================================
 SERVING NOTES (decisions resolved in the model-serving pass)
 
-* **Latency.** A single fused QSVM prediction measured **~445 ms** locally
-  (146 support vectors, FidelityStatevectorKernel). That is comfortably inside a
-  normal request, so prediction stays SYNCHRONOUS — no async/polling design is
-  needed. Both pickles are loaded once at startup, not per request.
+* **Latency.** Removing the QSVM roughly halves per-prediction latency: the
+  QSVM's ``FidelityStatevectorKernel`` evaluation was measured at **~445 ms**
+  locally (146 support vectors) — the slow half of the old two-model call.
+  Prediction stays SYNCHRONOUS either way — comfortably inside a normal
+  request. The pickle is loaded once at startup, not per request.
 
-* **Confidence is a MARGIN, not a probability.** ``QSVC`` is fit with
-  ``probability=False`` and exposes no ``predict_proba``. Both models therefore
-  report ``abs(decision_function(...))`` — signed distance from the separating
+* **Confidence is a MARGIN, not a probability.** The classical ``SVC`` is fit
+  with ``probability=False`` and exposes no ``predict_proba``, so this reports
+  ``abs(decision_function(...))`` — signed distance from the separating
   hyperplane. It is NOT calibrated and must never be shown to a clinician as a
   percentage likelihood. One ``decision_function`` call also yields the label
-  from its sign, so we spend one ~445 ms kernel evaluation per model, not two.
+  from its sign.
 
 * **ASF is derived from eTIV.** The pickle wants 24 features including ``ASF``
   (Atlas Scaling Factor), which the app never collects. See ``ASF_ETIV_CONST``
@@ -64,7 +78,9 @@ logger = logging.getLogger(__name__)
 # working without the pickles present).
 USE_REAL_MODEL = True
 
-QSVM_PICKLE = "qsvm_model.pkl"
+# The classical SVM is the only model the app serves (see the 2026-09-25 note
+# above). results/qsvm_model.pkl still exists for the research notebooks but is
+# never loaded here.
 SVM_PICKLE = "svm_model.pkl"
 
 # --------------------------------------------------------------------------
@@ -101,53 +117,39 @@ CLASS_LABELS = {0: "Nondemented", 1: "Demented"}
 
 
 def _model_dir() -> Path:
-    """Where the Phase 1 pickles live.
+    """Where the pickle lives.
 
     docker-compose mounts ./results at settings.MODEL_DIR (/model). Running
     uvicorn directly outside Docker, that path doesn't exist, so fall back to
     <repo>/results — services/ -> app/ -> backend/ -> repo root.
     """
     configured = Path(settings.MODEL_DIR)
-    if (configured / QSVM_PICKLE).exists():
+    if (configured / SVM_PICKLE).exists():
         return configured
     return Path(__file__).resolve().parents[3] / "results"
 
 
 @lru_cache(maxsize=1)
-def _load_models() -> tuple[object, object | None]:
-    """Load both pickles once. Cached — never re-read per request.
+def _load_models() -> object:
+    """Load the classical SVM pipeline once. Cached — never re-read per request.
 
-    The QSVM is required; the classical SVM is optional because it is
-    display-only, and a missing comparison model must not take the app down.
-    Regenerate it with `python backend/scripts/train_classical_svm.py`.
+    Required: this is the only model the app serves. Regenerate it with
+    `python backend/scripts/train_classical_svm.py`.
     """
     directory = _model_dir()
 
-    qsvm_path = directory / QSVM_PICKLE
-    with qsvm_path.open("rb") as handle:
-        qsvm = pickle.load(handle)
-    logger.info("Loaded QSVM pipeline from %s", qsvm_path)
-
-    svm = None
     svm_path = directory / SVM_PICKLE
-    if svm_path.exists():
-        with svm_path.open("rb") as handle:
-            svm = pickle.load(handle)
-        logger.info("Loaded classical SVM pipeline from %s", svm_path)
-    else:
-        logger.warning(
-            "Classical SVM pickle missing at %s — the comparison prediction will "
-            "be omitted. Run backend/scripts/train_classical_svm.py to create it.",
-            svm_path,
-        )
+    with svm_path.open("rb") as handle:
+        svm = pickle.load(handle)
+    logger.info("Loaded classical SVM pipeline from %s", svm_path)
 
-    return qsvm, svm
+    return svm
 
 
 def warm_models() -> bool:
-    """Preload the pickles at startup so the first upload isn't slow.
+    """Preload the pickle at startup so the first upload isn't slow.
 
-    Returns True if the QSVM loaded. Never raises: a model failure must not stop
+    Returns True if it loaded. Never raises: a model failure must not stop
     the API from booting — uploads still work, the visit just stays in
     `awaiting_uploads` instead of advancing, and /health reports the problem.
     """
@@ -205,8 +207,8 @@ def _predict_with(pipeline: object, row: list[float]) -> tuple[str, float]:
     """One decision_function call -> (label, margin).
 
     Binary classifier, classes_ = [0, 1]: a positive decision value means class 1
-    ("Demented"). Deriving the label from the sign avoids a second ~445 ms kernel
-    evaluation that predict() would cost.
+    ("Demented"). Deriving the label from the sign avoids a second call that
+    predict() would cost.
     """
     margin = float(pipeline.decision_function([row])[0])
     label = CLASS_LABELS[1] if margin > 0 else CLASS_LABELS[0]
@@ -230,7 +232,7 @@ def check_and_run_prediction(db: Session, visit: Visit) -> bool:
 
     if USE_REAL_MODEL:
         try:
-            qsvm_result, svm_result = _run_real_pipeline(visit)
+            result = _run_real_pipeline(visit)
         except Exception:  # noqa: BLE001 - a model failure must not lose the upload
             # The uploaded features are already persisted by the caller; leaving
             # the visit in `awaiting_uploads` means it can be retried once the
@@ -238,20 +240,18 @@ def check_and_run_prediction(db: Session, visit: Visit) -> bool:
             logger.exception("Real pipeline failed for visit %s", visit.id)
             return False
     else:
-        qsvm_result = _placeholder_prediction(visit)
-        svm_result = qsvm_result
+        result = _placeholder_prediction(visit)
 
-    # QSVM (canonical) result — the one agreement_flag compares the doctor against.
-    visit.model_prediction, visit.model_confidence = qsvm_result
-    # Classical SVM (display-only comparison). Feeds no computed field.
-    if svm_result is not None:
-        visit.svm_prediction, visit.svm_confidence = svm_result
+    # Classical SVM result — the one agreement_flag compares the doctor against
+    # (see the 2026-09-25 note at the top of this file for why it's the SVM and
+    # not the QSVM). svm_prediction/svm_confidence are no longer written.
+    visit.model_prediction, visit.model_confidence = result
     visit.status = "pending_review"
     return True
 
 
 def _placeholder_prediction(visit: Visit) -> tuple[str, float]:
-    """Deterministic stand-in so the review flow works without the pickles.
+    """Deterministic stand-in so the review flow works without the pickle.
 
     NOT a clinical output. Keyed off the visit id purely so tests are repeatable.
     """
@@ -259,25 +259,12 @@ def _placeholder_prediction(visit: Visit) -> tuple[str, float]:
     return prediction, 0.5
 
 
-def _run_real_pipeline(
-    visit: Visit,
-) -> tuple[tuple[str, float], tuple[str, float] | None]:
-    """Real fused inference: returns (qsvm_result, classical_svm_result).
-
-    The classical result is None when its pickle is absent — it is display-only,
-    so the visit still advances on the QSVM alone.
-    """
-    qsvm, svm = _load_models()
+def _run_real_pipeline(visit: Visit) -> tuple[str, float]:
+    """Real fused inference with the classical SVM: returns (label, margin)."""
+    svm = _load_models()
     row = build_feature_row(visit)
 
-    qsvm_result = _predict_with(qsvm, row)
-    svm_result = _predict_with(svm, row) if svm is not None else None
+    result = _predict_with(svm, row)
 
-    logger.info(
-        "visit=%s qsvm=%s (margin %.4f) svm=%s",
-        visit.id,
-        qsvm_result[0],
-        qsvm_result[1],
-        svm_result[0] if svm_result else "unavailable",
-    )
-    return qsvm_result, svm_result
+    logger.info("visit=%s svm=%s (margin %.4f)", visit.id, result[0], result[1])
+    return result

@@ -21,12 +21,15 @@ Each screening builds one 24-feature row:
 | MRI (2) | nWBV, eTIV | MRI upload → `mri_features.py` extractor |
 | Speech (18) | pause rate, speech rate, pitch, jitter, shimmer, MFCC 1–13 | speech upload → `speech_features.py` extractor |
 
-The fused QSVM ("Quantum SVM") is the canonical output; the classical SVM box is
-**display-only**, shown for comparison. Neither is degenerate on the retrained model — on the
-real evaluation set (`results/metrics_full.json`), single-modality accuracy is clinical ~72%/69%
-(SVM/QSVM), MRI ~78%/78%, speech ~64%/56%, and the **fused** model (~81%/78%) beats every single
-modality — there's no one block that dominates the decision the way MRI did on the old synthetic
-set.
+**2026-09-25: the classical SVM is now the only model the app serves** — the QSVM box has been
+removed from the screen. On the real evaluation set (`results/metrics_full.json`), the fused
+classical SVM (81.1%) beats the fused QSVM (78.1%) on every metric but specificity, so the app was
+switched from QSVM-canonical to SVM-canonical (see `backend/app/services/prediction.py`'s
+2026-09-25 note). Single-modality accuracy for context: clinical ~72%/69% (SVM/QSVM), MRI ~78%/78%,
+speech ~64%/56% — the **fused** SVM beats every single modality, and no one block dominates the
+decision the way MRI did on the old synthetic set. The QSVM is still trained and evaluated in
+`multimodal_qsvm.ipynb`/`metrics_full.ipynb` for the research comparison; it just isn't wired into
+the live screening flow any more.
 
 ## Recipes
 

@@ -13,6 +13,10 @@ both sides are now OASIS-derived. What's still worth checking: does deriving ASF
 from eTIV (rather than reading the OASIS pool's own true ASF) change any
 prediction on the training set, now that the model is the real-data pickle.
 
+**2026-09-25:** checks against ``results/svm_model.pkl`` (the classical SVM),
+not the QSVM -- that's the only pickle the app serves now (see the note at the
+top of ``app/services/prediction.py``).
+
 Run from the repository root:
 
     python backend/scripts/check_asf_fit.py
@@ -31,7 +35,7 @@ warnings.filterwarnings("ignore")
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TRAINING_SET = REPO_ROOT / "data" / "multimodal_dementia_dataset.csv"
 REAL = REPO_ROOT / "data" / "oasis2_mri_clinical.xlsx"
-QSVM = REPO_ROOT / "results" / "qsvm_model.pkl"
+SVM = REPO_ROOT / "results" / "svm_model.pkl"
 
 CLINICAL = ["MMSE", "ASF", "EDUC", "SES"]
 MRI = ["nWBV", "eTIV"]
@@ -85,7 +89,7 @@ def main() -> None:
     )
 
     print("\n2. Does deriving ASF (vs. reading the OASIS pool's true ASF) change any prediction?")
-    with QSVM.open("rb") as handle:
+    with SVM.open("rb") as handle:
         pipeline = pickle.load(handle)
 
     features = training[FEATURE_ORDER].to_numpy(dtype=float)

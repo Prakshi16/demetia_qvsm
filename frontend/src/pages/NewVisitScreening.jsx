@@ -339,9 +339,9 @@ export default function NewVisitScreening() {
       </section>
 
       {/* --- Result ---------------------------------------------------- */}
-      {/* The model runs server-side inside the second upload request and takes
-          ~450 ms, so by the time that response lands the prediction is already
-          in it. Nothing to poll. */}
+      {/* The model runs server-side inside the second upload request (classical
+          SVM only as of 2026-09-25 — fast, well under 100ms), so by the time
+          that response lands the prediction is already in it. Nothing to poll. */}
       {hasPrediction ? (
         <section className="visit-card visit-card--result">
           <div className="visit-card-head">
@@ -351,23 +351,14 @@ export default function NewVisitScreening() {
 
           <div className="visit-predictions">
             <div className="visit-prediction">
-              <p className="visit-prediction-label">Quantum SVM</p>
+              <p className="visit-prediction-label">Classical SVM</p>
               <p className="visit-prediction-value">{visit.model_prediction}</p>
-              {/* NOT a probability: QSVC has no predict_proba, so this is the
-                  distance from the decision boundary. Never render it as a
-                  percentage or a bar. */}
+              {/* NOT a probability: the SVM is fit with probability=False, so
+                  this is the distance from the decision boundary. Never render
+                  it as a percentage or a bar. */}
               <p className="visit-prediction-margin">
                 margin {visit.model_confidence?.toFixed(2) ?? "—"}
               </p>
-            </div>
-
-            <div className="visit-prediction">
-              <p className="visit-prediction-label">Classical SVM</p>
-              <p className="visit-prediction-value">{visit.svm_prediction ?? "—"}</p>
-              <p className="visit-prediction-margin">
-                margin {visit.svm_confidence?.toFixed(2) ?? "—"}
-              </p>
-              <p className="visit-note">Research comparison only.</p>
             </div>
           </div>
 

@@ -170,16 +170,19 @@ class Visit(Base):
     speech_object_path: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # --- model output (screening only, filled once all 3 modalities are done) ---
-    # model_prediction / model_confidence hold the QSVM ("Quantum SVM") result —
-    # the canonical prediction that agreement_flag compares the doctor against.
+    # model_prediction / model_confidence hold the classical SVM result — the
+    # canonical prediction that agreement_flag compares the doctor against.
+    # (2026-09-25: switched from the QSVM to the classical SVM — on the
+    # real-data retrain the SVM beat the QSVM on every metric but specificity;
+    # see the note at the top of app/services/prediction.py.)
     model_prediction: Mapped[str | None] = mapped_column(
         _enum(*MODEL_PREDICTION, name="model_prediction"), nullable=True
     )
     model_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
-    # svm_prediction / svm_confidence hold the classical SVM result, shown next to
-    # the QSVM one on the visit detail page (labelled "Classical SVM") purely for
-    # research/comparison — this is a capstone demo, not a clinical tool. The
-    # classical SVM feeds NO computed field: agreement_flag stays tied to QSVM only.
+    # Legacy: svm_prediction / svm_confidence held the classical-SVM comparison
+    # result back when model_prediction was the QSVM. No longer written for new
+    # predictions (the SVM result now lives in model_prediction itself) — kept
+    # for visits predicted before 2026-09-25 and to avoid a migration.
     svm_prediction: Mapped[str | None] = mapped_column(
         _enum(*MODEL_PREDICTION, name="model_prediction"), nullable=True
     )

@@ -1,20 +1,24 @@
 """Smoke-test the model-serving seam without a database or an HTTP request.
 
 Exercises exactly what an upload endpoint triggers — feature assembly, ASF
-derivation, both pipelines, and the visit state transition — using two real
-patients from the real assembled dataset (real_dataset_setup.md), embedded as
-literals so this runs for anyone (``data/`` is gitignored and teammates don't
-have it). Both rows were confirmed against the 2026-09-24 retrained pickles
-(``results/qsvm_model.pkl`` / ``results/svm_model.pkl``) to predict their true
-label under the *served* feature path (ASF derived from eTIV, not read from the
-CSV — see ``prediction.py``'s ASF note) before being hardcoded here.
+derivation, the classical-SVM pipeline, and the visit state transition — using
+two real patients from the real assembled dataset (real_dataset_setup.md),
+embedded as literals so this runs for anyone (``data/`` is gitignored and
+teammates don't have it). Both rows were confirmed against the retrained
+``results/svm_model.pkl`` to predict their true label under the *served*
+feature path (ASF derived from eTIV, not read from the CSV — see
+``prediction.py``'s ASF note) before being hardcoded here.
 
-Run inside the backend container, where the pickles are mounted at /model:
+As of 2026-09-25 the app serves the classical SVM only (it beat the QSVM on
+every metric but specificity on the real-data retrain — see the note at the
+top of ``prediction.py``); ``results/qsvm_model.pkl`` is no longer loaded here.
+
+Run inside the backend container, where the pickle is mounted at /model:
 
     docker compose run --rm backend python scripts/smoke_prediction.py
 
 Expected: both patients predicted correctly, status advances to
-``pending_review``, and each prediction takes roughly half a second.
+``pending_review``, each prediction well under 100ms (no quantum kernel call).
 """
 from __future__ import annotations
 
@@ -104,8 +108,7 @@ def main() -> int:
         print(f"{spec['name']}")
         print(f"  ASF derived from eTIV : {row[1]:.4f}  (eTIV {row[5]:.1f})")
         print(f"  fired                 : {fired}   status -> {visit.status}")
-        print(f"  Quantum SVM           : {visit.model_prediction}  margin {visit.model_confidence:.4f}")
-        print(f"  Classical SVM         : {visit.svm_prediction}  margin {visit.svm_confidence:.4f}")
+        print(f"  Classical SVM         : {visit.model_prediction}  margin {visit.model_confidence:.4f}")
         print(f"  truth                 : {spec['truth']}")
         print(f"  latency               : {elapsed * 1000:.0f} ms\n")
 
@@ -115,7 +118,12 @@ def main() -> int:
             failures.append(f"{spec['name']}: status is {visit.status}, expected pending_review")
         if visit.model_prediction != spec["truth"]:
             failures.append(
-                f"{spec['name']}: QSVM said {visit.model_prediction}, expected {spec['truth']}"
+                f"{spec['name']}: SVM said {visit.model_prediction}, expected {spec['truth']}"
+            )
+        if visit.svm_prediction is not None:
+            failures.append(
+                f"{spec['name']}: svm_prediction should stay unset now that the SVM "
+                f"result lives in model_prediction, got {visit.svm_prediction!r}"
             )
 
     # Idempotence: a second call must not re-run or clobber an existing prediction.

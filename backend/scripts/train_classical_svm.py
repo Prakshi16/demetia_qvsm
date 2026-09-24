@@ -1,16 +1,23 @@
-"""Train and save the classical-SVM comparison model (results/svm_model.pkl).
+"""Train and save the classical-SVM model (results/svm_model.pkl).
 
 Why this exists
 ---------------
-Phase 1 pickled only the QSVM (`results/qsvm_model.pkl`). The app shows the
-doctor TWO predictions side by side — "Quantum SVM" and "Classical SVM" — so the
-Phase 1 headline finding (the quantum kernel shows no advantage over a classical
-RBF SVM) is visible in the product itself rather than hidden. That needs a second
-pickled model, which this script produces.
+Originally a second, comparison-only pickle alongside the QSVM — the app showed
+the doctor both predictions side by side so the Phase 1 headline finding (the
+quantum kernel shows no advantage over a classical RBF SVM) was visible in the
+product itself. **As of 2026-09-25 this is the *only* model the app serves**:
+on the real-data retrain the classical SVM beat the QSVM on every metric but
+specificity (accuracy 81.1% vs 78.1%, F1 83.4% vs 79.9%, ROC-AUC 90.8% vs
+84.5% — see `results/metrics_full.json` and the note at the top of
+`app/services/prediction.py`), so it was promoted from comparison to canonical.
+The QSVM pickle (`results/qsvm_model.pkl`) still gets trained by
+`multimodal_qsvm.ipynb` for the capstone's research comparison; this script's
+output is what the live app actually loads.
 
 Design: the classical pipeline is IDENTICAL to the quantum one except for the
-final estimator, so the two predictions are genuinely comparable and any
-difference is attributable to the kernel, not to preprocessing:
+final estimator, so the two predictions stayed genuinely comparable while both
+were served, and any difference was attributable to the kernel, not to
+preprocessing:
 
     24 raw features -> ColumnTransformer(per-modality StandardScaler + PCA(2))
                     -> SVC(kernel='rbf')          [classical]

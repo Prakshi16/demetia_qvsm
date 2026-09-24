@@ -1,11 +1,13 @@
 # Cortex Health Portal — Multimodal QSVM Dementia Detection
 
 A hospital screening app that fuses **clinical scores + MRI-derived volumetrics + speech features**
-into a 6-qubit Quantum SVM (with a classical SVM shown alongside for comparison) to flag dementia
-risk, wrapped in a full multi-hospital clinical workflow (patient intake, screening/follow-up visits,
-clinician review, diagnosis history).
+to flag dementia risk, wrapped in a full multi-hospital clinical workflow (patient intake,
+screening/follow-up visits, clinician review, diagnosis history). Built as a capstone comparing a
+6-qubit Quantum SVM against a classical SVM baseline — **the live app serves the classical SVM**
+(see "Headline result" below for why); the QSVM remains fully trained and evaluated in the research
+notebooks for that comparison, it just isn't in the clinician-facing product any more.
 
-## Headline result (real data, 2026-09-24)
+## Headline result (real data, 2026-09-24) — and why the app serves the SVM, not the QSVM
 
 The model is trained on a **real** dataset — OASIS-1/OASIS-2 clinical + MRI data, cross-matched by
 `(label, sex, age)` with windowed features from a real speech corpus (131 speakers). It replaced an
@@ -20,22 +22,26 @@ no noise injection needed):
 | Speech only (18 feat) | 63.5% | 56.2% |
 | **Fused (24 feat, 6 qubits)** | **81.1% ± 3.0%** | **78.1% ± 7.8%** |
 
-Fused beats every single modality on both classifiers, and the quantum kernel shows no consistent
-advantage over the classical RBF kernel — an honest, disclosed finding, not a bug. Full metrics
-(precision/recall/specificity/F1/ROC-AUC, sex-stratified rows, a sensitivity table, and a second
-"clinical+MRI only, all ~385 OASIS subjects" evaluation) are in `results/metrics_full.json`, produced
-by `metrics_full.ipynb`. Dataset provenance, the matching algorithm, and known limitations are in
-`data/DATASHEET.md`.
+Fused beats every single modality on both classifiers. The classical SVM also beats the QSVM on
+every metric but specificity — accuracy, precision, F1, macro-F1, and especially ROC-AUC (90.8% vs
+84.5%, the widest gap of any metric). **2026-09-25: the app was switched to serve the classical SVM
+as the clinician-facing prediction** (previously the QSVM was canonical and the SVM was shown only
+as a side-by-side comparison — see the note at the top of `backend/app/services/prediction.py`). The
+quantum-shows-no-advantage finding is disclosed, not hidden — it's exactly why the app changed.
+Full metrics (precision/recall/specificity/F1/ROC-AUC, sex-stratified rows, a sensitivity table, and
+a second "clinical+MRI only, all ~385 OASIS subjects" evaluation) are in `results/metrics_full.json`,
+produced by `metrics_full.ipynb`. Dataset provenance, the matching algorithm, and known limitations
+are in `data/DATASHEET.md`.
 
 ## Architecture
 
 ```
 Clinical form ──┐
-MRI upload ─────┼─► per-modality StandardScaler + PCA(2) ─► concat (6-D) ─► MinMaxScaler
-Speech upload ──┘                                                              │
-                                                                                ▼
-                                                          ZZFeatureMap(6) ─► QSVC  (quantum)
-                                                          same 6-D          ─► SVC  (classical, display-only)
+MRI upload ─────┼─► per-modality StandardScaler + PCA(2) ─► concat (6-D) ─► SVC  (classical, served)
+Speech upload ──┘
+
+Research-only (multimodal_qsvm.ipynb / metrics_full.ipynb), not called by the live app:
+                same 6-D ─► MinMaxScaler ─► ZZFeatureMap(6) ─► QSVC  (quantum)
 ```
 
 - **Backend:** FastAPI + SQLAlchemy + Supabase (Postgres + Storage + Auth), `backend/`.

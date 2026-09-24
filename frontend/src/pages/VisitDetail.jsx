@@ -433,21 +433,14 @@ export default function VisitDetail() {
 
           <div className="visit-predictions">
             <div className="visit-prediction">
-              <p className="visit-prediction-label">Quantum SVM</p>
+              <p className="visit-prediction-label">Classical SVM</p>
               <p className="visit-prediction-value">{visit.model_prediction}</p>
-              {/* NOT a probability: QSVC has no predict_proba, so this is the
-                  distance from the decision boundary. Never a percentage. */}
+              {/* NOT a probability: the SVM is fit with probability=False, so
+                  this is the distance from the decision boundary. Never a
+                  percentage. */}
               <p className="visit-prediction-margin">
                 margin {visit.model_confidence?.toFixed(2) ?? "—"}
               </p>
-            </div>
-            <div className="visit-prediction">
-              <p className="visit-prediction-label">Classical SVM</p>
-              <p className="visit-prediction-value">{visit.svm_prediction ?? "—"}</p>
-              <p className="visit-prediction-margin">
-                margin {visit.svm_confidence?.toFixed(2) ?? "—"}
-              </p>
-              <p className="visit-note">Research comparison only.</p>
             </div>
           </div>
         </section>
