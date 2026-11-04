@@ -34,7 +34,8 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # mri_extractor_calibration.pkl (2026-09-25) is optional at runtime -- mri_features.py
 # falls back to the raw heuristic if it's missing -- but bake it in anyway so a fresh
 # deploy gets the calibrated MRI extraction by default.
-COPY results/qsvm_model.pkl results/svm_model.pkl results/mri_extractor_calibration.pkl /model/
+# model_info.json (2026-11-04) feeds the SVM/QSVM comparison toggle (GET /models/info).
+COPY results/qsvm_model.pkl results/svm_model.pkl results/mri_extractor_calibration.pkl results/model_info.json /model/
 
 # App code. In dev this is shadowed by the docker-compose bind mount; in a real
 # build (Render) it's the actual source.

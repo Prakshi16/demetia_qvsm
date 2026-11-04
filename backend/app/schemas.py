@@ -10,9 +10,9 @@ from __future__ import annotations
 import re
 import uuid
 from datetime import date, datetime
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.services.emails import clean_email_domain
 
@@ -70,6 +70,74 @@ def validate_password(value: str) -> str:
     return value
 
 
+def clean_optional_text(value: Optional[str], *, label: str, max_len: int) -> Optional[str]:
+    """Trim free text; blank -> None; reject control characters and overlong input."""
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if cleaned == "":
+        return None
+    if len(cleaned) > max_len:
+        raise ValueError(f"{label} must be at most {max_len} characters")
+    if any(ord(ch) < 32 and ch not in "\n\r\t" for ch in cleaned):
+        raise ValueError(f"{label} contains control characters")
+    return cleaned
+
+
+# Phone: digits with an optional leading +, and the usual separators. 7–15
+# digits is the E.164 range; separators are stripped before counting.
+_PHONE_ALLOWED = re.compile(r"^\+?[\d\s\-().]+$")
+
+
+def clean_phone(value: Optional[str]) -> Optional[str]:
+    if value is None or value.strip() == "":
+        return None
+    cleaned = value.strip()
+    if not _PHONE_ALLOWED.fullmatch(cleaned):
+        raise ValueError("Phone may contain only digits, spaces, +, -, ( and )")
+    digits = re.sub(r"\D", "", cleaned)
+    if not 7 <= len(digits) <= 15:
+        raise ValueError("Phone must have between 7 and 15 digits")
+    return cleaned
+
+
+_CITY_RE = re.compile(r"[^\W\d_][\w\s.'\-]*")
+
+
+def clean_city(value: Optional[str]) -> Optional[str]:
+    cleaned = clean_optional_text(value, label="City", max_len=80)
+    if cleaned is not None and (not _CITY_RE.fullmatch(cleaned) or any(ch.isdigit() for ch in cleaned)):
+        raise ValueError("City must contain only letters, spaces, . ' and -")
+    return cleaned
+
+
+def clean_address(value: Optional[str]) -> Optional[str]:
+    return clean_optional_text(value, label="Address", max_len=300)
+
+
+SEX_VALUES = ("Female", "Male", "Other", "Prefer not to say")
+
+# Clinical scales. CDR is a fixed ordinal scale, not a continuous number.
+CDR_VALUES = (0.0, 0.5, 1.0, 2.0, 3.0)
+MMSE_RANGE = (0, 30)
+EDU_RANGE = (0, 30)
+SES_RANGE = (1, 5)
+
+# strict=True rejects strings like "12" and booleans; allow_inf_nan=False
+# rejects NaN/Infinity, which Python's JSON parser accepts as bare literals.
+ClinicalNumber = Optional[Annotated[float, Field(strict=True, allow_inf_nan=False)]]
+
+
+def _check_whole_in_range(value: Optional[float], label: str, low: int, high: int) -> Optional[float]:
+    if value is None:
+        return None
+    if float(value) != int(value):
+        raise ValueError(f"{label} must be a whole number")
+    if not low <= value <= high:
+        raise ValueError(f"{label} must be between {low} and {high}")
+    return float(value)
+
+
 def clean_org_name_optional(value: Optional[str]) -> Optional[str]:
     return None if value is None else clean_org_name(value)
 
@@ -98,6 +166,8 @@ class RegisterHospitalRequest(BaseModel):
     _v_pin = field_validator("pincode")(clean_pincode)
     _v_domain = field_validator("email_domain")(clean_email_domain)
     _v_pw = field_validator("password")(validate_password)
+    _v_address = field_validator("address")(clean_address)
+    _v_city = field_validator("city")(clean_city)
 
 
 class LoginRequest(BaseModel):
@@ -198,6 +268,8 @@ class HospitalUpdate(BaseModel):
 
     _v_name = field_validator("name")(clean_org_name_optional)
     _v_pin = field_validator("pincode")(clean_pincode_optional)
+    _v_address = field_validator("address")(clean_address)
+    _v_city = field_validator("city")(clean_city)
 
 
 # --------------------------------------------------------------------------- #
@@ -213,6 +285,37 @@ class PatientCreate(BaseModel):
     consent_relationship: Optional[str] = None
 
     _v_name = field_validator("name")(clean_person_name)
+    _v_phone = field_validator("phone")(clean_phone)
+    _v_address = field_validator("address")(clean_address)
+
+    @field_validator("dob")
+    @classmethod
+    def _v_dob(cls, value: Optional[date]) -> Optional[date]:
+        if value is None:
+            return None
+        today = date.today()
+        if value > today:
+            raise ValueError("Date of birth cannot be in the future")
+        if value.year < today.year - 120:
+            raise ValueError("Date of birth is more than 120 years ago")
+        return value
+
+    @field_validator("sex")
+    @classmethod
+    def _v_sex(cls, value: Optional[str]) -> Optional[str]:
+        if value is None or value.strip() == "":
+            return None
+        if value not in SEX_VALUES:
+            raise ValueError(f"Sex must be one of: {', '.join(SEX_VALUES)}")
+        return value
+
+    @field_validator("consent_relationship")
+    @classmethod
+    def _v_relationship(cls, value: Optional[str]) -> Optional[str]:
+        cleaned = clean_optional_text(value, label="Relationship", max_len=60)
+        if cleaned is not None and not all(ch.isalpha() or ch in " -'/" for ch in cleaned):
+            raise ValueError("Relationship must be words only, e.g. Daughter")
+        return cleaned
 
     @model_validator(mode="after")
     def _require_relationship_for_guardian(self) -> "PatientCreate":
@@ -297,12 +400,58 @@ class NextVisitTypeOut(BaseModel):
 # Visits
 # --------------------------------------------------------------------------- #
 class VisitCreate(BaseModel):
+    """Clinical measures for a new visit.
+
+    Every number is validated here, not only in the browser: whole-number MMSE
+    0–30, CDR on its fixed scale, whole years of education 0–30, SES 1–5.
+    Strings, booleans, NaN and Infinity are rejected outright. MMSE and CDR are
+    required on both visit types; EDU and SES are required on a screening (the
+    model needs them) and refused on a follow-up (it doesn't collect them), so
+    nothing is silently dropped or imputed.
+    """
+
     patient_id: uuid.UUID
     visit_type: VisitType
-    mmse: Optional[float] = None
-    cdr: Optional[float] = None
-    edu: Optional[float] = None  # screening only
-    ses: Optional[float] = None  # screening only
+    mmse: ClinicalNumber = None
+    cdr: ClinicalNumber = None
+    edu: ClinicalNumber = None  # screening only
+    ses: ClinicalNumber = None  # screening only
+
+    @field_validator("mmse")
+    @classmethod
+    def _v_mmse(cls, value: Optional[float]) -> Optional[float]:
+        return _check_whole_in_range(value, "MMSE", *MMSE_RANGE)
+
+    @field_validator("cdr")
+    @classmethod
+    def _v_cdr(cls, value: Optional[float]) -> Optional[float]:
+        if value is None:
+            return None
+        if float(value) not in CDR_VALUES:
+            raise ValueError("CDR must be one of 0, 0.5, 1, 2, 3")
+        return float(value)
+
+    @field_validator("edu")
+    @classmethod
+    def _v_edu(cls, value: Optional[float]) -> Optional[float]:
+        return _check_whole_in_range(value, "Education (years)", *EDU_RANGE)
+
+    @field_validator("ses")
+    @classmethod
+    def _v_ses(cls, value: Optional[float]) -> Optional[float]:
+        return _check_whole_in_range(value, "Socioeconomic status", *SES_RANGE)
+
+    @model_validator(mode="after")
+    def _required_by_type(self) -> "VisitCreate":
+        missing = [name for name in ("mmse", "cdr") if getattr(self, name) is None]
+        if self.visit_type == "screening":
+            missing += [name for name in ("edu", "ses") if getattr(self, name) is None]
+        elif self.edu is not None or self.ses is not None:
+            raise ValueError("edu and ses are collected on screening visits only")
+        if missing:
+            kind = self.visit_type.replace("_", "-")
+            raise ValueError(f"Required for a {kind} visit: {', '.join(missing)}")
+        return self
 
 
 class DiagnosisHistoryOut(BaseModel):
@@ -339,6 +488,10 @@ class VisitDetailOut(BaseModel):
     # before that date and for schema/DB backward compatibility.
     svm_prediction: Optional[str] = None
     svm_confidence: Optional[float] = None
+    # Research view (migration 006): the quantum-kernel SVM on the same row.
+    qsvm_prediction: Optional[str] = None
+    qsvm_confidence: Optional[float] = None
+    mri_extraction: Optional[dict] = None
     requires_review: bool
     status: str
     doctor_diagnosis: Optional[str] = None
@@ -366,3 +519,27 @@ class VisitFileOut(BaseModel):
 class DiagnosisCreate(BaseModel):
     doctor_diagnosis: DoctorDiagnosis
     doctor_notes: Optional[str] = None
+
+    @field_validator("doctor_notes")
+    @classmethod
+    def _v_notes(cls, value: Optional[str]) -> Optional[str]:
+        return clean_optional_text(value, label="Notes", max_len=4000)
+
+
+class ModelCard(BaseModel):
+    """One classifier's cross-validated performance, for the comparison view."""
+
+    key: Literal["svm", "qsvm"]
+    name: str
+    kernel: str
+    canonical: bool
+    metrics: dict[str, dict[str, float]]
+    # |decision value| at the 95th percentile of the training set — the axis
+    # extent for the decision-value chart, so the two models' very different
+    # margin scales are each drawn against their own typical range.
+    decision_scale: float
+
+
+class ModelInfoOut(BaseModel):
+    evaluation: str
+    models: list[ModelCard]

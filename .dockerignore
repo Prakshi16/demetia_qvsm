@@ -13,6 +13,7 @@ results/*
 !results/qsvm_model.pkl
 !results/svm_model.pkl
 !results/mri_extractor_calibration.pkl
+!results/model_info.json
 
 # The frontend is deployed separately (Vercel/Netlify), not from this image.
 frontend/

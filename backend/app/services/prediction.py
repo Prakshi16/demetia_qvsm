@@ -1,4 +1,14 @@
-"""Model-serving seam for the fused classical-SVM prediction.
+"""Model-serving seam for the fused prediction (classical SVM + QSVM research view).
+
+**2026-11-04: QSVM back as a research view.** For the capstone's academic
+comparison, the visit screens now have a model toggle that shows the QSVM's
+prediction for the same patient next to the classical SVM's. The QSVM is computed
+alongside the SVM into its own columns (``qsvm_prediction``/``qsvm_confidence``,
+migration 006). **The classical SVM stays canonical:** ``model_prediction`` is
+still its result and ``agreement_flag`` still compares the doctor against it.
+A QSVM failure only leaves the research columns empty; it never blocks the
+canonical prediction or the clinician's queue. Cost: about 0.5 s of statevector
+kernel evaluation per prediction, inside the second upload request.
 
 ``check_and_run_prediction`` is the exact function Bishal's MRI upload and
 Sheetal's speech upload endpoints call at the very end of their handlers, once
@@ -64,6 +74,7 @@ from __future__ import annotations
 
 import logging
 import pickle
+import time
 from functools import lru_cache
 from pathlib import Path
 
@@ -82,6 +93,8 @@ USE_REAL_MODEL = True
 # above). results/qsvm_model.pkl still exists for the research notebooks but is
 # never loaded here.
 SVM_PICKLE = "svm_model.pkl"
+# Research view only (2026-11-04) — see the note at the top of this file.
+QSVM_PICKLE = "qsvm_model.pkl"
 
 # --------------------------------------------------------------------------
 # ASF derivation
@@ -146,6 +159,30 @@ def _load_models() -> object:
     return svm
 
 
+@lru_cache(maxsize=1)
+def _load_qsvm() -> object | None:
+    """Load the QSVM pickle once, or None if it's missing or won't unpickle.
+
+    Optional by design: it powers the research toggle only.
+    """
+    path = _model_dir() / QSVM_PICKLE
+    if not path.exists():
+        logger.warning("QSVM pickle missing at %s; the research view will be empty", path)
+        return None
+    try:
+        with path.open("rb") as handle:
+            qsvm = pickle.load(handle)
+    except Exception:  # noqa: BLE001 - optional model, never fatal
+        logger.exception("Could not load the QSVM pickle; the research view will be empty")
+        return None
+    logger.info("Loaded QSVM pipeline from %s", path)
+    return qsvm
+
+
+def qsvm_available() -> bool:
+    return _load_qsvm() is not None
+
+
 def warm_models() -> bool:
     """Preload the pickle at startup so the first upload isn't slow.
 
@@ -157,6 +194,7 @@ def warm_models() -> bool:
         return False
     try:
         _load_models()
+        _load_qsvm()  # optional; logs and returns None on failure
         return True
     except Exception:  # noqa: BLE001 - startup must survive any model failure
         logger.exception("Model preload failed; predictions will fall back to the stub")
@@ -230,6 +268,8 @@ def clear_stale_prediction(visit: Visit) -> None:
     visit.model_confidence = None
     visit.svm_prediction = None
     visit.svm_confidence = None
+    visit.qsvm_prediction = None
+    visit.qsvm_confidence = None
 
 
 def check_and_run_prediction(db: Session, visit: Visit) -> bool:
@@ -264,7 +304,30 @@ def check_and_run_prediction(db: Session, visit: Visit) -> bool:
     # not the QSVM). svm_prediction/svm_confidence are no longer written.
     visit.model_prediction, visit.model_confidence = result
     visit.status = "pending_review"
+
+    # Research view: the QSVM on the same row. Never blocks the canonical result.
+    if USE_REAL_MODEL:
+        visit.qsvm_prediction, visit.qsvm_confidence = _run_qsvm(visit) or (None, None)
+    else:
+        visit.qsvm_prediction, visit.qsvm_confidence = result
     return True
+
+
+def _run_qsvm(visit: Visit) -> tuple[str, float] | None:
+    qsvm = _load_qsvm()
+    if qsvm is None:
+        return None
+    try:
+        started = time.perf_counter()
+        result = _predict_with(qsvm, build_feature_row(visit))
+        logger.info(
+            "visit=%s qsvm=%s (margin %.4f, %.0f ms)",
+            visit.id, result[0], result[1], (time.perf_counter() - started) * 1000,
+        )
+        return result
+    except Exception:  # noqa: BLE001 - research view only
+        logger.exception("QSVM failed for visit %s; research view left empty", visit.id)
+        return None
 
 
 def _placeholder_prediction(visit: Visit) -> tuple[str, float]:

@@ -187,6 +187,16 @@ class Visit(Base):
         _enum(*MODEL_PREDICTION, name="model_prediction"), nullable=True
     )
     svm_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Research view (migration 006): the quantum-kernel SVM's output on the same
+    # row, shown behind the visit screens' model toggle. Never canonical — it
+    # feeds no computed field (agreement_flag uses model_prediction).
+    qsvm_prediction: Mapped[str | None] = mapped_column(
+        _enum(*MODEL_PREDICTION, name="model_prediction"), nullable=True
+    )
+    qsvm_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # How the MRI was read (migration 006): input kind, format, method, expected
+    # error, warnings. Written by the MRI upload endpoint.
+    mri_extraction: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     # --- doctor review (screening only) ---
     requires_review: Mapped[bool] = mapped_column(
