@@ -120,6 +120,7 @@ WCAG AA contrast check (`npm run check:contrast`). The living reference is the i
 
 ## Key documents
 
+- `DEPLOY.md`: step-by-step Supabase + Render + Vercel deployment, with troubleshooting.
 - `PROJECT_CONTEXT.md` — the chronological build record (append-only sections).
 - `data/DATASHEET.md` — dataset provenance, collection process, known limitations, sign-off log.
 - `real_dataset_setup.md` *(gitignored)* — the real-data build's canonical spec.
