@@ -25,7 +25,7 @@ import RegisterPatient from "./pages/RegisterPatient";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import VisitDetail from "./pages/VisitDetail";
-import "./App.css";
+import DesignSystem from "./pages/DesignSystem";
 
 export default function App() {
   return (
@@ -88,6 +88,10 @@ export default function App() {
             back link and every list row already point at, so they are fixed. */}
         <Route path="/patients/:patientId" element={<PatientProfile />} />
         <Route path="/visits/:visitId" element={<VisitDetail />} />
+
+        {/* Living reference for the design system: tokens -> components ->
+            the prediction panel in every state. */}
+        <Route path="/design-system" element={<DesignSystem />} />
       </Route>
 
       {/* Unknown path -> home, which itself redirects to /signin if signed out. */}

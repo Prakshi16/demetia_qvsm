@@ -17,6 +17,16 @@ CONTRACTS = {
     "speech_windows_raw.csv": ["speaker_id", "clip_path", "window_idx", *SPEECH_FEATURES],
     "speech_windows_clean.csv": ["speaker_id", "clip_path", "window_idx", *SPEECH_FEATURES],
     "speech_model_agesex.csv": ["speaker_id", "age_model", "sex_model", "n_clips"],
+    "speaker_birthdates.csv": [
+        "speaker_id", "display_name", "birth_year", "est_recording_year",
+        "age_birthdate", "confidence", "note",
+    ],
+    "speaker_sex_lookup.csv": ["speaker_id", "sex_name", "ambiguous"],
+    "speakers_meta.csv": [
+        "speaker_id", "label", "sex", "age_final", "age_lo", "age_hi",
+        "age_model", "age_birthdate", "age_source", "age_model_vs_birthdate_gap",
+        "orig_split",
+    ],
 }
 
 problems: list[str] = []

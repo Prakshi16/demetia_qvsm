@@ -16,7 +16,35 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { api } from "../api/client";
-import { validatePersonName } from "../utils/validate";
+import {
+  phoneCharsOnly,
+  validateDob,
+  validateFreeText,
+  validatePersonName,
+  validatePhone,
+  validateRelationship,
+} from "../utils/validate";
+
+function patientErrors(form, isGuardianConsent) {
+  const errors = {
+    name: validatePersonName(form.name),
+    dob: validateDob(form.dob),
+    phone: validatePhone(form.phone),
+    address: validateFreeText(form.address, { label: "Address", maxLength: 300 }),
+    consent_relationship: isGuardianConsent
+      ? validateRelationship(form.consent_relationship, { required: true })
+      : null,
+  };
+  return Object.fromEntries(Object.entries(errors).filter(([, message]) => message));
+}
+
+function FieldError({ message }) {
+  return message ? (
+    <span className="field-error" role="alert">
+      {message}
+    </span>
+  ) : null;
+}
 
 // Matches the consent_given_by Postgres enum ("patient" | "guardian").
 const CONSENT_PATIENT = "patient";
@@ -48,8 +76,15 @@ export default function RegisterPatient() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [touched, setTouched] = useState({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const isGuardianConsent = form.consent_given_by === CONSENT_GUARDIAN;
+  const errors = patientErrors(form, isGuardianConsent);
+  // "required" waits for submit; format errors show once a field is left.
+  const shown = (name) =>
+    ((submitAttempted || (touched[name] && String(form[name] ?? "").trim() !== "")) && errors[name]) || null;
+  const touch = (name) => () => setTouched((current) => ({ ...current, [name]: true }));
 
   function updateField(name, value) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -59,9 +94,9 @@ export default function RegisterPatient() {
     event.preventDefault();
     setError("");
 
-    const nameError = validatePersonName(form.name);
-    if (nameError) {
-      setError(nameError);
+    setSubmitAttempted(true);
+    if (Object.keys(errors).length > 0) {
+      setError("Fix the highlighted fields first.");
       return;
     }
 
@@ -105,7 +140,7 @@ export default function RegisterPatient() {
         </p>
       </header>
 
-      <form className="visit-form" onSubmit={handleSubmit}>
+      <form className="visit-form" onSubmit={handleSubmit} noValidate>
         <section className="visit-card">
           <div className="visit-card-head">
             <h2>Patient details</h2>
@@ -118,10 +153,13 @@ export default function RegisterPatient() {
                 type="text"
                 value={form.name}
                 onChange={(event) => updateField("name", event.target.value)}
+                onBlur={touch("name")}
+                aria-invalid={shown("name") ? "true" : undefined}
                 autoComplete="off"
                 required
                 disabled={isSubmitting}
               />
+              <FieldError message={shown("name")} />
             </label>
 
             <div className="visit-form-row">
@@ -134,8 +172,12 @@ export default function RegisterPatient() {
                   // field the re-screening interval is reasoned about against.
                   max={new Date().toISOString().slice(0, 10)}
                   onChange={(event) => updateField("dob", event.target.value)}
+                  onBlur={touch("dob")}
+                  min={`${new Date().getFullYear() - 120}-01-01`}
+                  aria-invalid={shown("dob") ? "true" : undefined}
                   disabled={isSubmitting}
                 />
+                <FieldError message={shown("dob")} />
               </label>
 
               <label className="field">
@@ -160,11 +202,16 @@ export default function RegisterPatient() {
                 <span className="field-label">Phone</span>
                 <input
                   type="tel"
+                  inputMode="tel"
                   value={form.phone}
-                  onChange={(event) => updateField("phone", event.target.value)}
+                  onChange={(event) => updateField("phone", phoneCharsOnly(event.target.value))}
+                  onBlur={touch("phone")}
+                  placeholder="e.g. +91 98765 43210"
                   autoComplete="off"
                   disabled={isSubmitting}
+                  aria-invalid={shown("phone") ? "true" : undefined}
                 />
+                <FieldError message={shown("phone")} />
               </label>
 
               <label className="field">
@@ -173,9 +220,13 @@ export default function RegisterPatient() {
                   type="text"
                   value={form.address}
                   onChange={(event) => updateField("address", event.target.value)}
+                  onBlur={touch("address")}
+                  maxLength={300}
                   autoComplete="off"
                   disabled={isSubmitting}
+                  aria-invalid={shown("address") ? "true" : undefined}
                 />
+                <FieldError message={shown("address")} />
               </label>
             </div>
           </div>
@@ -229,11 +280,15 @@ export default function RegisterPatient() {
                 onChange={(event) =>
                   updateField("consent_relationship", event.target.value)
                 }
+                onBlur={touch("consent_relationship")}
                 placeholder="e.g. daughter, spouse, legal guardian"
+                maxLength={60}
                 autoComplete="off"
                 required
                 disabled={isSubmitting}
+                aria-invalid={shown("consent_relationship") ? "true" : undefined}
               />
+              <FieldError message={shown("consent_relationship")} />
             </label>
           ) : null}
         </section>

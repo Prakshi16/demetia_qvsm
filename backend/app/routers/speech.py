@@ -4,6 +4,11 @@ Speech upload endpoint.
 Uploads a speech recording, stores it in Supabase Storage,
 extracts the 18-feature speech vector, saves it to the visit,
 and triggers prediction if both modalities are complete.
+
+Re-upload is allowed (e.g. the receptionist picked the wrong file) any time before a
+diagnosis has been saved -- this simply overwrites the stored feature vector; if a
+prediction had already fired on the old (wrong) file, it's cleared and recomputed from
+the corrected one. Once the visit is `reviewed`, re-upload is refused outright.
 """
 
 from __future__ import annotations
@@ -22,7 +27,7 @@ from app.db import get_db
 from app.deps import CurrentUser, get_current_user, get_scoped_query
 from app.models import Visit
 from app.schemas import VisitDetailOut
-from app.services.prediction import check_and_run_prediction
+from app.services.prediction import check_and_run_prediction, clear_stale_prediction
 from app.services.speech_features import extract_speech_features
 
 router = APIRouter(prefix="/visits", tags=["speech"])
@@ -113,6 +118,12 @@ async def upload_speech(
             detail="Speech upload is only allowed for screening visits",
         )
 
+    if visit.status == "reviewed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Diagnosis already saved for this visit; re-upload is not allowed.",
+        )
+
     # ------------------------------------------------------------------
     # Validate extension
     # ------------------------------------------------------------------
@@ -177,8 +188,12 @@ async def upload_speech(
     visit.speech_status = "done"
 
     # ------------------------------------------------------------------
-    # Trigger prediction
+    # Trigger prediction (re-upload after a prediction already fired -- e.g. the
+    # wrong file was picked the first time -- clears the stale one so it recomputes)
     # ------------------------------------------------------------------
+    if visit.model_prediction is not None:
+        clear_stale_prediction(visit)
+
     check_and_run_prediction(db, visit)
 
     db.commit()

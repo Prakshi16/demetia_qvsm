@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import gzip
 import io
+import json
 import os
 import sys
 import uuid
@@ -52,12 +53,17 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 # Synthetic inputs. Dummy data only, per the project's standing rule.
 # ---------------------------------------------------------------------------
 
-def make_nifti() -> bytes:
+def make_nifti(inner_radius: float = 16.0) -> bytes:
     """A brain-ish volume: a bright core inside a dimmer intracranial shell.
 
     The extractor is an intensity/geometry proxy, so this gives it the contrast
     it looks for. The resulting eTIV is far outside the OASIS training range —
     that is the synthetic phantom, not a bug.
+
+    inner_radius shrinks/grows the bright core (default 16, same as always) —
+    used by the re-upload check below to produce a visibly different feature
+    vector from the default call, so "the vector actually changed" is a real
+    assertion, not just "the request succeeded."
     """
     rng = np.random.default_rng(7)
     grid = np.mgrid[:48, :48, :48].astype(np.float32)
@@ -66,7 +72,7 @@ def make_nifti() -> bytes:
 
     volume = np.zeros((48, 48, 48), dtype=np.float32)
     volume[radius < 20] = 0.45
-    volume[radius < 16] = 0.85
+    volume[radius < inner_radius] = 0.85
     volume = np.clip(volume + rng.normal(0, 0.02, volume.shape).astype(np.float32), 0, 1)
 
     image = nib.Nifti1Image(volume, affine=np.diag([1.5, 1.5, 1.5, 1.0]))
@@ -76,6 +82,72 @@ def make_nifti() -> bytes:
     image.to_file_map(file_map)
     file_map["image"].fileobj.close()
     return buffer.getvalue()
+
+
+def _head_phantom(shape=(64, 76, 64)) -> np.ndarray:
+    """Layered T1-like head (scalp, skull, CSF, grey, white, ventricles)."""
+    rng = np.random.default_rng(11)
+    z, y, x = np.indices(shape, dtype=np.float32)
+    c = (np.array(shape) - 1) / 2
+    rad = np.array(shape) * 0.42
+    r = np.sqrt(((z - c[0]) / rad[0]) ** 2 + ((y - c[1]) / rad[1]) ** 2 + ((x - c[2]) / rad[2]) ** 2)
+    vol = np.zeros(shape, np.float32)
+    vol[r <= 1.0] = 0.8
+    vol[r <= 0.95] = 0.08
+    vol[r <= 0.86] = 0.15
+    vol[r <= 0.8] = 0.45
+    vol[r <= 0.68] = 0.7
+    vol += rng.normal(0, 0.03, shape).astype(np.float32)
+    return (np.clip(vol, 0, 1) * 1000).astype(np.int16)
+
+
+def make_png_slice() -> bytes:
+    from PIL import Image
+
+    sl = _head_phantom()[:, :, 32].astype(np.float32)
+    buffer = io.BytesIO()
+    Image.fromarray((sl / sl.max() * 255).astype(np.uint8)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def make_analyze_pair() -> tuple[bytes, bytes]:
+    image = nib.AnalyzeImage(_head_phantom(), np.diag([2.0, 2.0, 2.0, 1.0]))
+    header, data = io.BytesIO(), io.BytesIO()
+    image.to_file_map({"header": nib.FileHolder(fileobj=header), "image": nib.FileHolder(fileobj=data)})
+    return header.getvalue(), data.getvalue()
+
+
+def make_dicom_series_zip() -> bytes:
+    import zipfile
+
+    from pydicom.dataset import Dataset, FileMetaDataset
+    from pydicom.uid import ExplicitVRLittleEndian, MRImageStorage, generate_uid
+
+    vol = _head_phantom((48, 56, 40)).astype(np.uint16)
+    series = generate_uid()
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as archive:
+        for z in range(vol.shape[2]):
+            meta = FileMetaDataset()
+            meta.MediaStorageSOPClassUID = MRImageStorage
+            meta.MediaStorageSOPInstanceUID = generate_uid()
+            meta.TransferSyntaxUID = ExplicitVRLittleEndian
+            ds = Dataset()
+            ds.file_meta = meta
+            ds.SOPClassUID, ds.SOPInstanceUID = MRImageStorage, meta.MediaStorageSOPInstanceUID
+            ds.SeriesInstanceUID, ds.Modality, ds.InstanceNumber = series, "MR", z + 1
+            pixels = vol[:, :, z].T
+            ds.Rows, ds.Columns = pixels.shape
+            ds.SamplesPerPixel, ds.PhotometricInterpretation = 1, "MONOCHROME2"
+            ds.BitsAllocated, ds.BitsStored, ds.HighBit, ds.PixelRepresentation = 16, 16, 15, 0
+            ds.PixelSpacing, ds.SliceThickness = [2.5, 2.5], 2.5
+            ds.ImageOrientationPatient = [1, 0, 0, 0, 1, 0]
+            ds.ImagePositionPatient = [0.0, 0.0, z * 2.5]
+            ds.PixelData = pixels.tobytes()
+            buffer = io.BytesIO()
+            ds.save_as(buffer, enforce_file_format=True)
+            archive.writestr(f"DICOM/IM{z:04d}", buffer.getvalue())
+    return out.getvalue()
 
 
 def make_wav() -> bytes:
@@ -292,10 +364,33 @@ def run(client: httpx.Client) -> None:
     check("follow-up before any screening -> 400", response.status_code == 400,
           str(response.status_code))
 
+    # -- numeric fields only take numbers, in range -------------------------
+    good = {"patient_id": patient_id, "visit_type": "screening", "mmse": 24, "cdr": 0.5, "edu": 12, "ses": 3}
+    bad_cases = {
+        "MMSE as a string": {"mmse": "24"},
+        "MMSE out of range (31)": {"mmse": 31},
+        "MMSE with a decimal": {"mmse": 24.5},
+        "CDR off the scale (0.7)": {"cdr": 0.7},
+        "education negative": {"edu": -1},
+        "SES out of range (6)": {"ses": 6},
+        "SES as a boolean": {"ses": True},
+        "education missing": {"edu": None},
+    }
+    rejected = []
+    for label, change in bad_cases.items():
+        r = client.post(f"{BASE}/visits", headers=desk, json={**good, **change})
+        if r.status_code != 422:
+            rejected.append(f"{label} -> {r.status_code}")
+    check("every malformed clinical number -> 422 (8 cases)", not rejected, "; ".join(rejected))
+    raw_nan = '{"patient_id": "%s", "visit_type": "screening", "mmse": NaN, "cdr": 0.5, "edu": 12, "ses": 3}' % patient_id
+    r = client.post(f"{BASE}/visits", headers={**desk, "content-type": "application/json"}, content=raw_nan)
+    check("a bare NaN literal -> 422, not a 500", r.status_code == 422, str(r.status_code))
+    r = client.post(f"{BASE}/patients", headers=desk, json={
+        "name": f"{PREFIX} Phone {TAG}", "consent_given_by": "patient", "phone": "call me maybe"})
+    check("patient with a non-numeric phone -> 422", r.status_code == 422, str(r.status_code))
+
     # -- screening visit ---------------------------------------------------
-    response = client.post(f"{BASE}/visits", headers=desk, json={
-        "patient_id": patient_id, "visit_type": "screening",
-        "mmse": 24, "cdr": 0.5, "edu": 12, "ses": 3})
+    response = client.post(f"{BASE}/visits", headers=desk, json=good)
     response.raise_for_status()
     visit = response.json()
     visit_id = visit["id"]
@@ -322,8 +417,8 @@ def run(client: httpx.Client) -> None:
                            files={"file": ("s.nii.gz", nifti, "application/gzip")})
     response.raise_for_status()
     after_mri = response.json()
-    check("MRI persists a 4-feature vector",
-          len(after_mri.get("mri_feature_vector") or []) == 4,
+    check("MRI persists a 2-feature vector",
+          len(after_mri.get("mri_feature_vector") or []) == 2,
           str(after_mri.get("mri_feature_vector")))
     check("one modality is not enough: still awaiting_uploads, no prediction",
           after_mri["status"] == "awaiting_uploads"
@@ -347,13 +442,94 @@ def run(client: httpx.Client) -> None:
     check("both modalities in -> prediction appears, status pending_review",
           after_speech["status"] == "pending_review" and model_says is not None,
           f"{model_says} margin={after_speech['model_confidence']}")
-    check("classical SVM comparison present too",
-          after_speech["svm_prediction"] is not None,
-          f"{after_speech['svm_prediction']} margin={after_speech['svm_confidence']}")
+    check("legacy svm_prediction column stays unset (SVM result lives in model_prediction now)",
+          after_speech["svm_prediction"] is None,
+          f"{after_speech['svm_prediction']}")
+    check("QSVM research view is computed alongside the canonical SVM",
+          after_speech.get("qsvm_prediction") in ("Demented", "Nondemented")
+          and after_speech.get("qsvm_confidence") is not None,
+          f"{after_speech.get('qsvm_prediction')} margin={after_speech.get('qsvm_confidence')}")
+    meta = after_speech.get("mri_extraction") or {}
+    check("MRI extraction metadata is stored (kind, format, method)",
+          meta.get("input_kind") == "volume" and meta.get("source_format") == "nifti"
+          and meta.get("method") in ("calibrated", "uncalibrated-heuristic"),
+          json.dumps({k: meta.get(k) for k in ("input_kind", "source_format", "method")}))
+
+    info = client.get(f"{BASE}/models/info", headers=doctor)
+    check("model comparison data is served for the toggle",
+          info.status_code == 200
+          and {m["key"] for m in info.json()["models"]} == {"svm", "qsvm"},
+          f"{info.status_code}")
 
     persisted = client.get(f"{BASE}/visits/{visit_id}", headers=desk).json()
     check("prediction is persisted, not just echoed",
           persisted["model_prediction"] == model_says)
+
+    # -- re-upload: the receptionist picked the wrong file the first time -----
+    # Still pending_review (no diagnosis saved yet) -- re-upload must be accepted,
+    # overwrite the feature vector, and recompute the prediction from it.
+    before_mri_vector = persisted["mri_feature_vector"]
+    response = client.post(f"{BASE}/visits/{visit_id}/mri-upload", headers=desk,
+                           files={"file": ("s2.nii.gz", make_nifti(inner_radius=8.0), "application/gzip")})
+    check("re-upload before a diagnosis is saved -> 200, not rejected",
+          response.status_code == 200, str(response.status_code))
+    after_reupload = response.json()
+    check("re-upload overwrites the feature vector",
+          after_reupload["mri_feature_vector"] != before_mri_vector,
+          f"{before_mri_vector} -> {after_reupload['mri_feature_vector']}")
+    check("re-upload recomputes the prediction (still present, status back to pending_review)",
+          after_reupload["model_prediction"] is not None
+          and after_reupload["status"] == "pending_review",
+          f"{after_reupload['model_prediction']} / {after_reupload['status']}")
+    # -- any MRI format: a 2-D slice, an Analyze pair as two files, a zipped
+    # DICOM series. Each is a re-upload, so each also re-runs both models.
+    slice_png = make_png_slice()
+    response = client.post(f"{BASE}/visits/{visit_id}/mri-upload", headers=desk,
+                           files={"file": ("axial.png", slice_png, "image/png")})
+    body = response.json() if response.status_code == 200 else {}
+    check("MRI as a PNG slice -> 200, flagged as a slice with eTIV not measured",
+          response.status_code == 200
+          and (body.get("mri_extraction") or {}).get("input_kind") == "slice"
+          and (body.get("mri_extraction") or {}).get("etiv_measured") is False,
+          f"{response.status_code} {response.text[:160]}")
+
+    header, image = make_analyze_pair()
+    response = client.post(f"{BASE}/visits/{visit_id}/mri-upload", headers=desk,
+                           files=[("files", ("scan.hdr", header, "application/octet-stream")),
+                                  ("files", ("scan.img", image, "application/octet-stream"))])
+    body = response.json() if response.status_code == 200 else {}
+    stored = client.get(f"{BASE}/visits/{visit_id}/file/mri", headers=doctor)
+    stored_name = stored.json().get("filename", "") if stored.status_code == 200 else ""
+    check("MRI as an Analyze .hdr + .img pair (two files) -> 200, stored as one bundle",
+          response.status_code == 200
+          and (body.get("mri_extraction") or {}).get("input_kind") == "volume"
+          and stored_name.endswith("_bundle.zip"),
+          f"{response.status_code} stored as {stored_name!r}")
+    r = client.get(f"{BASE}/visits/{visit_id}/scan", headers=doctor)
+    check("the bundled Analyze pair still opens in the viewer",
+          r.status_code == 200 and r.content[:2] == b"\x1f\x8b", f"{r.status_code}")
+
+    response = client.post(f"{BASE}/visits/{visit_id}/mri-upload", headers=desk,
+                           files={"file": ("series.zip", make_dicom_series_zip(), "application/zip")})
+    body = response.json() if response.status_code == 200 else {}
+    check("MRI as a zipped DICOM series -> 200",
+          response.status_code == 200
+          and (body.get("mri_extraction") or {}).get("source_format") == "dicom-series",
+          f"{response.status_code} {response.text[:160]}")
+
+    response = client.post(f"{BASE}/visits/{visit_id}/mri-upload", headers=desk,
+                           files={"file": ("broken.nii.gz", b"\x1f\x8bnot really", "application/gzip")})
+    check("a corrupt scan is a clean 422, not a 500", response.status_code == 422,
+          f"{response.status_code} {response.text[:120]}")
+
+    # Back to a NIfTI volume for the rest of the flow.
+    response = client.post(f"{BASE}/visits/{visit_id}/mri-upload", headers=desk,
+                           files={"file": ("s3.nii.gz", make_nifti(), "application/gzip")})
+    response.raise_for_status()
+    after_reupload = response.json()
+    # The re-uploads may have flipped the label -- resync model_says so the
+    # rest of the flow (the mismatch path below) uses the current prediction.
+    model_says = after_reupload["model_prediction"]
 
     # -- the clinician can pull the raw scan / recording back -------------
     for kind in ("mri", "speech"):
@@ -361,6 +537,20 @@ def run(client: httpx.Client) -> None:
         check(f"clinician gets a signed URL for the {kind} upload",
               r.status_code == 200 and bool(r.json().get("url")),
               f"{r.status_code} {r.text[:120]}")
+
+    r = client.get(f"{BASE}/visits/{visit_id}/scan", headers=doctor)
+    check("clinician gets the scan as gzip NIfTI for the viewer",
+          r.status_code == 200
+          and r.headers.get("content-type") == "application/gzip"
+          and r.content[:2] == b"\x1f\x8b",
+          f"{r.status_code} {r.headers.get('content-type')} {len(r.content)}b")
+
+    r = client.get(f"{BASE}/visits/{visit_id}/audio", headers=doctor)
+    check("clinician gets the recording as playable MP3",
+          r.status_code == 200
+          and r.headers.get("content-type") == "audio/mpeg"
+          and r.content[:3] in (b"ID3", b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"),
+          f"{r.status_code} {r.headers.get('content-type')} {len(r.content)}b")
 
     queue = client.get(f"{BASE}/patients/pending-review", headers=doctor).json()
     check("patient reaches the clinician's pending-review queue",
@@ -405,6 +595,13 @@ def run(client: httpx.Client) -> None:
         check("the rejected no-op wrote no history row",
               len(hist.get("diagnosis_history") or []) == 2,
               str(len(hist.get("diagnosis_history") or [])))
+
+    # -- re-upload after the diagnosis is saved must now be refused ----------
+    response = client.post(f"{BASE}/visits/{visit_id}/mri-upload", headers=desk,
+                           files={"file": ("s3.nii.gz", make_nifti(inner_radius=12.0), "application/gzip")})
+    check("re-upload after a diagnosis is saved -> 400, not silently accepted",
+          response.status_code == 400 and "already saved" in response.text,
+          f"{response.status_code} {response.text[:120]}")
 
     # -- follow-up ---------------------------------------------------------
     decision = client.get(f"{BASE}/patients/{patient_id}/next-visit-type",

@@ -19,6 +19,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/useAuth";
 import {
+  digitsOnly,
   normaliseEmailDomain,
   slugLocalPart,
   validateEmailDomain,
@@ -107,8 +108,10 @@ export default function SignUp() {
               <span className="field-label">Pincode</span>
               <input
                 value={pincode}
-                onChange={(event) => setPincode(event.target.value)}
+                onChange={(event) => setPincode(digitsOnly(event.target.value, 6))}
                 inputMode="numeric"
+                pattern="[0-9]{6}"
+                autoComplete="postal-code"
                 maxLength={6}
                 placeholder="6 digits"
                 required

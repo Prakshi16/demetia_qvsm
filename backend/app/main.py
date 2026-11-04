@@ -5,9 +5,13 @@ proves the Supabase connection works. Auth/patient/visit routers are added in
 later passes and mounted onto `api_router` here.
 """
 import logging
+import math
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, Depends, FastAPI
+from fastapi import APIRouter, Depends, FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -18,13 +22,15 @@ from app.routers import (
     auth,
     dashboard,
     hospital,
+    models_info,
     mri_upload,
     patients,
     speech,
     staff,
     visits,
 )
-from app.services.prediction import USE_REAL_MODEL, warm_models
+from app.services.mri_features import calibration_info
+from app.services.prediction import USE_REAL_MODEL, qsvm_available, warm_models
 
 # Without this the app's own loggers propagate to an unconfigured root logger and
 # are dropped — uvicorn only configures its own. The per-prediction log line in
@@ -53,6 +59,26 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Cortex Health Portal API", version="0.1.0", lifespan=lifespan)
+
+
+def _json_safe(value):
+    """Replace NaN/Infinity (valid in Python's JSON parser, invalid in JSON)."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    return value
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+    """FastAPI's default 422 echoes the offending input back. When that input is a
+    bare NaN or Infinity literal, encoding the response raises and the client gets
+    a 500 instead of the 422. This handler sanitises the echo."""
+    errors = jsonable_encoder(exc.errors(), custom_encoder={float: lambda f: f if math.isfinite(f) else str(f)})
+    return JSONResponse(status_code=422, content={"detail": _json_safe(errors)})
 
 # CORS: driven by CORS_ORIGINS (comma-separated), defaulting to the Vite dev
 # server. This used to include "*" for the demo, which cannot survive deploy:
@@ -83,7 +109,14 @@ def health(db: Session = Depends(get_db)) -> dict:
         model_state = "stub"
     else:
         model_state = "ok" if _models_ready else "error"
-    return {"status": "ok", "db": db_state, "model": model_state}
+    return {
+        "status": "ok",
+        "db": db_state,
+        "model": model_state,
+        # Research view + MRI extractor: informational, never fail the check.
+        "qsvm": "ok" if (USE_REAL_MODEL and qsvm_available()) else "unavailable",
+        "mri_calibration": "ok" if calibration_info() else "uncalibrated",
+    }
 
 
 # Feature routers (§5). Upload endpoints (Bishal/Sheetal) mount onto visits later.
@@ -95,5 +128,6 @@ api_router.include_router(visits.router)
 api_router.include_router(speech.router)
 api_router.include_router(mri_upload.router)
 api_router.include_router(dashboard.router)
+api_router.include_router(models_info.router)
 
 app.include_router(api_router)

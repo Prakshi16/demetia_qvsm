@@ -84,3 +84,86 @@ export function slugLocalPart(name) {
     .slice(0, 2);
   return tokens.join(".");
 }
+
+// --------------------------------------------------------------------------
+// Numbers and other structured fields — mirrors of app/schemas.py
+// (VisitCreate, PatientCreate). Inputs hold strings; these judge the string.
+// --------------------------------------------------------------------------
+
+/** Keep only ASCII digits (and cap the length) — used on every keystroke. */
+export function digitsOnly(value, maxLength = Infinity) {
+  return String(value ?? "").replace(/\D+/g, "").slice(0, maxLength);
+}
+
+/**
+ * A whole number in [min, max]. Rejects blanks (when required), signs,
+ * decimals, exponents ("1e2"), spaces and anything non-numeric — the same
+ * set the API's strict validator refuses.
+ */
+export function validateWholeNumber(value, { label, min, max, required = true }) {
+  const text = String(value ?? "").trim();
+  if (text === "") return required ? `${label} is required.` : null;
+  if (!/^\d+$/.test(text)) return `${label} must be a whole number.`;
+  const number = Number(text);
+  if (number < min || number > max) return `${label} must be between ${min} and ${max}.`;
+  return null;
+}
+
+/** One of a fixed set of option values (e.g. CDR "0" | "0.5" | ...). */
+export function validateChoice(value, { label, options, required = true }) {
+  const text = String(value ?? "");
+  if (text === "") return required ? `Select a ${label}.` : null;
+  return options.includes(text) ? null : `${label} must be one of ${options.join(", ")}.`;
+}
+
+export function validatePhone(value) {
+  const text = String(value ?? "").trim();
+  if (text === "") return null; // optional
+  if (!/^\+?[\d\s\-().]+$/.test(text)) {
+    return "Phone may contain only digits, spaces, +, -, ( and ).";
+  }
+  const digits = text.replace(/\D/g, "").length;
+  return digits >= 7 && digits <= 15 ? null : "Phone must have between 7 and 15 digits.";
+}
+
+/** Keystroke filter for phone inputs: drop anything the validator rejects. */
+export function phoneCharsOnly(value) {
+  return String(value ?? "").replace(/[^\d\s\-().+]/g, "").slice(0, 24);
+}
+
+export function validateDob(value, today = new Date()) {
+  if (!value) return null; // optional
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Enter the date as YYYY-MM-DD.";
+  const dob = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(dob.getTime())) return "Enter a real date.";
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (dob > todayMidnight) return "Date of birth can't be in the future.";
+  if (dob.getFullYear() < today.getFullYear() - 120) return "Date of birth is more than 120 years ago.";
+  return null;
+}
+
+export function validateRelationship(value, { required }) {
+  const text = String(value ?? "").trim();
+  if (text === "") return required ? "Say who the guardian is to the patient, e.g. Daughter." : null;
+  if (text.length > 60) return "Relationship must be at most 60 characters.";
+  return /^[\p{L} \-'/]+$/u.test(text) ? null : "Relationship must be words only, e.g. Daughter.";
+}
+
+export function validateFreeText(value, { label, maxLength }) {
+  const text = String(value ?? "");
+  return text.trim().length > maxLength ? `${label} must be at most ${maxLength} characters.` : null;
+}
+
+/** Clinical scales, shared by the screening and follow-up forms. */
+export const CLINICAL_RULES = {
+  mmse: { label: "MMSE", min: 0, max: 30 },
+  edu: { label: "Education (years)", min: 0, max: 30 },
+};
+export const CDR_OPTIONS = ["0", "0.5", "1", "2", "3"];
+export const SES_OPTIONS = [
+  { value: "1", label: "1 — highest" },
+  { value: "2", label: "2" },
+  { value: "3", label: "3 — middle" },
+  { value: "4", label: "4" },
+  { value: "5", label: "5 — lowest" },
+];

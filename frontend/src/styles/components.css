@@ -1,0 +1,915 @@
+/**
+ * Component layer. Each block is one component of the system; the living
+ * reference with every variant is the /design-system page.
+ *
+ * Class names predate the system (screens were written against them), so
+ * the system adopts them rather than renaming 15 screens:
+ *   .button-primary / .button-quiet / .button-secondary / .button-danger
+ *   .field + .field-label + .field-hint + .field-error
+ *   .visit-card (= Card), .visit-chip / .patient-chip / ... (= Badge)
+ */
+
+/* ===== Button ============================================================ */
+.button-primary,
+.button-secondary,
+.button-quiet,
+.button-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-height: var(--button-height);
+  padding: 0 var(--button-padding-x);
+  font: inherit;
+  font-size: var(--text-body-sm);
+  font-weight: var(--weight-semibold);
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  border-radius: var(--button-radius);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.button-primary {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  box-shadow: var(--shadow-xs);
+}
+
+.button-primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.button-secondary {
+  color: var(--color-accent-text);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-border);
+}
+
+.button-secondary:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.button-quiet {
+  min-height: var(--button-height-sm);
+  padding: 0 var(--space-sm);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+}
+
+.button-quiet:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+  border-color: var(--color-text-subtle);
+}
+
+.button-danger {
+  color: var(--color-on-accent);
+  background: var(--color-danger-solid);
+}
+
+.button-primary:active:not(:disabled),
+.button-secondary:active:not(:disabled),
+.button-quiet:active:not(:disabled),
+.button-danger:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.button-primary:disabled,
+.button-secondary:disabled,
+.button-quiet:disabled,
+.button-danger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.button-block {
+  width: 100%;
+}
+
+/* Inline text-style action ("Try again"). */
+.link-button {
+  padding: 0;
+  font: inherit;
+  color: var(--color-text-link);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: var(--button-height-sm);
+  height: var(--button-height-sm);
+  padding: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: color var(--motion-fast), background-color var(--motion-fast), border-color var(--motion-fast);
+}
+
+.icon-button:hover {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
+}
+
+/* ===== Field ============================================================= */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5, 6px);
+  min-width: 0;
+}
+
+.field-label {
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+}
+
+.field-label .field-optional {
+  font-weight: var(--weight-regular);
+  color: var(--color-text-muted);
+}
+
+.field-hint {
+  font-size: var(--text-small);
+  font-weight: var(--weight-regular);
+  color: var(--color-text-muted);
+}
+
+.field-error {
+  display: flex;
+  gap: var(--space-2xs);
+  align-items: flex-start;
+  font-size: var(--text-small);
+  font-weight: var(--weight-medium);
+  color: var(--color-danger-fg);
+}
+
+.field-error::before {
+  content: "!";
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-top: 0.1rem;
+  font-size: 0.7rem;
+  font-weight: var(--weight-bold);
+  color: var(--color-on-accent);
+  background: var(--color-danger-solid);
+  border-radius: 50%;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  min-height: var(--field-height);
+  padding: 9px 12px;
+  font: inherit;
+  font-size: var(--text-body);
+  color: var(--color-text);
+  background: var(--field-bg);
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  transition: border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.field select {
+  appearance: none;
+  padding-right: 36px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%),
+    linear-gradient(135deg, var(--color-text-muted) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.field input[type="number"] {
+  font-variant-numeric: tabular-nums;
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
+  color: var(--color-text-subtle);
+}
+
+.field textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.field input:hover:not(:disabled):not(:read-only),
+.field select:hover:not(:disabled),
+.field textarea:hover:not(:disabled) {
+  border-color: var(--color-text-subtle);
+}
+
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible,
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--color-focus-ring);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.field [aria-invalid="true"] {
+  border-color: var(--color-danger-fg);
+}
+
+.field [aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 3px var(--color-danger-bg);
+}
+
+.field input:disabled,
+.field select:disabled,
+.field textarea:disabled,
+.field input:read-only {
+  color: var(--color-text-muted);
+  background: var(--field-bg-readonly);
+}
+
+.field input:read-only {
+  cursor: default;
+}
+
+.field input:read-only:focus {
+  box-shadow: none;
+  border-color: var(--field-border);
+}
+
+/* Form-level error banner. */
+.form-error {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-body-sm);
+  color: var(--color-danger-fg);
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+  border-radius: var(--radius-md);
+}
+
+/* ===== Card ============================================================== */
+.card,
+.visit-card {
+  padding: var(--card-padding);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  min-width: 0;
+}
+
+.visit-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.visit-card-head h2 {
+  margin: 0;
+}
+
+.visit-card--locked {
+  opacity: 0.55;
+}
+
+.visit-card--result {
+  border-color: var(--color-accent-border);
+}
+
+/* ===== Badge (status chip) ============================================== */
+.badge,
+.visit-chip,
+.patient-chip,
+.visit-rect-status,
+.staff-role,
+.nav-user-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  line-height: 1.4;
+  white-space: nowrap;
+  color: var(--color-neutral-fg);
+  background: var(--color-neutral-bg);
+  border: 1px solid var(--color-neutral-border);
+  border-radius: var(--radius-pill);
+}
+
+/* A leading dot so status never relies on colour alone in the list views
+   (the word carries the meaning; the dot just helps scanning). */
+.badge::before,
+.visit-chip::before,
+.patient-chip::before,
+.visit-rect-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.badge--success,
+.visit-chip--done,
+.visit-chip--match,
+.patient-chip--reviewed,
+.patient-chip--completed,
+.visit-rect-status--reviewed,
+.visit-rect-status--completed {
+  color: var(--color-success-fg);
+  background: var(--color-success-bg);
+  border-color: var(--color-success-border);
+}
+
+.badge--warning,
+.visit-chip--mismatch,
+.patient-chip--pending_review,
+.patient-chip--missing,
+.visit-rect-status--pending_review {
+  color: var(--color-warning-fg);
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-border);
+}
+
+.badge--info,
+.staff-role--clinician {
+  color: var(--color-info-fg);
+  background: var(--color-info-bg);
+  border-color: var(--color-info-border);
+}
+
+.badge--danger {
+  color: var(--color-danger-fg);
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+}
+
+.badge--quantum {
+  color: var(--color-model-qsvm);
+  background: var(--color-model-qsvm-soft);
+  border-color: transparent;
+}
+
+.visit-rect-status--awaiting_uploads,
+.patient-chip--awaiting_uploads {
+  border-style: dashed;
+}
+
+/* ===== Notice (inline alert) ============================================ */
+.notice,
+.visit-disclaimer {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-start;
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-body-sm);
+  color: var(--color-text);
+  background: var(--color-info-bg);
+  border: 1px solid var(--color-info-border);
+  border-radius: var(--radius-md);
+}
+
+.visit-disclaimer::before,
+.notice::before {
+  content: "i";
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 1px;
+  font-size: 0.75rem;
+  font-weight: var(--weight-bold);
+  font-style: italic;
+  font-family: Georgia, serif;
+  color: var(--color-on-accent);
+  background: var(--color-info-fg);
+  border-radius: 50%;
+}
+
+.notice--warning {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-border);
+}
+
+.notice--warning::before {
+  content: "!";
+  font-style: normal;
+  font-family: inherit;
+  background: var(--color-warning-fg);
+}
+
+.notice ul {
+  margin: var(--space-2xs) 0 0;
+  padding-left: 1.1rem;
+}
+
+/* ===== Segmented control ================================================= */
+.segmented {
+  --segmented-index: 0;
+  --segmented-count: 2;
+  position: relative;
+  display: inline-grid;
+  max-width: 100%;
+  /* minmax(0, 1fr): options may shrink below their text width on a phone
+     instead of pushing the control off-screen. */
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  padding: 3px;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  isolation: isolate;
+}
+
+/* The sliding thumb — one element that moves, rather than each option
+   repainting, is what makes the switch read as one smooth motion. */
+.segmented::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / var(--segmented-count));
+  background: var(--color-surface);
+  border-radius: calc(var(--radius-md) - 2px);
+  box-shadow: var(--shadow-sm);
+  transform: translateX(calc(var(--segmented-index) * 100%));
+  transition: transform var(--motion-slow) var(--ease-spring);
+}
+
+.segmented button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 var(--space-md);
+  font: inherit;
+  font-size: var(--text-body-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  border-radius: calc(var(--radius-md) - 2px);
+  cursor: pointer;
+  transition: color var(--motion-base) var(--ease-standard);
+}
+
+.segmented button[aria-pressed="true"],
+.segmented button[aria-checked="true"] {
+  color: var(--color-text);
+}
+
+.segmented button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.segmented button {
+  min-width: 0;
+}
+
+.segmented-label,
+.segmented-label-long,
+.segmented-label-short {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.segmented-label-short {
+  display: none;
+}
+
+@media (max-width: 560px) {
+  .segmented {
+    display: grid;
+    width: 100%;
+  }
+
+  .segmented button {
+    padding: 0 var(--space-xs);
+  }
+
+  .segmented-label-long {
+    display: none;
+  }
+
+  .segmented-label-short {
+    display: inline;
+  }
+}
+
+.segmented-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dot, var(--color-text-subtle));
+}
+
+/* ===== Spinner / skeleton ============================================== */
+.spinner {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid var(--color-border-strong);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.skeleton {
+  display: block;
+  height: 0.9em;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--color-surface-sunken) 25%, var(--color-surface-hover) 50%, var(--color-surface-sunken) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* ===== Data list (dt/dd grid) ========================================== */
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr));
+  gap: var(--space-md) var(--space-lg);
+  margin: 0;
+}
+
+.detail-grid dt {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.detail-grid dd {
+  margin: 4px 0 0;
+  font-size: var(--text-lead);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.detail-grid-wide {
+  grid-column: 1 / -1;
+}
+
+.list-note,
+.visit-note,
+.visit-loading {
+  margin: 0;
+  font-size: var(--text-small);
+  color: var(--color-text-muted);
+}
+
+.list-note {
+  padding: var(--space-md) 0;
+}
+
+.empty-state {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xl) var(--space-md);
+  text-align: center;
+  color: var(--color-text-muted);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+}
+
+/* ===== MRI upload (dropzone) ============================================ */
+.mri-upload {
+  width: 100%;
+}
+
+.mri-upload__input {
+  display: none;
+}
+
+.mri-upload__dropzone {
+  min-height: 11rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  padding: var(--space-lg);
+  color: var(--color-text);
+  text-align: center;
+  background: var(--color-surface-sunken);
+  border: 2px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: border-color var(--motion-fast), background-color var(--motion-fast), transform var(--motion-base) var(--ease-spring);
+}
+
+.mri-upload__dropzone:hover,
+.mri-upload__dropzone--dragging {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.mri-upload__dropzone--dragging {
+  transform: scale(1.01);
+}
+
+.mri-upload__dropzone[aria-disabled="true"] {
+  cursor: progress;
+  opacity: 0.8;
+}
+
+.mri-upload__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--color-accent-text);
+  background: var(--color-accent-soft);
+  border-radius: 50%;
+}
+
+.mri-upload__status {
+  font-weight: var(--weight-semibold);
+}
+
+.mri-upload__hint,
+.mri-upload__file {
+  margin: 0;
+  font-size: var(--text-small);
+  color: var(--color-text-muted);
+}
+
+.mri-upload__formats {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-text-muted);
+}
+
+.mri-upload__file {
+  margin-top: var(--space-xs);
+  overflow-wrap: anywhere;
+}
+
+.mri-upload__error {
+  margin-top: var(--space-xs);
+}
+
+/* ===== Speech capture =================================================== */
+.speech-capture {
+  width: 100%;
+}
+
+.speech-capture__card {
+  padding: var(--space-lg);
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.speech-capture__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.speech-capture__header h3 {
+  font-size: var(--text-body);
+}
+
+.speech-capture__status {
+  padding: 2px 9px;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  text-transform: capitalize;
+  color: var(--color-neutral-fg);
+  background: var(--color-neutral-bg);
+  border-radius: var(--radius-pill);
+}
+
+.speech-capture__status--recording {
+  color: var(--color-danger-fg);
+  background: var(--color-danger-bg);
+}
+
+.speech-capture__status--done {
+  color: var(--color-success-fg);
+  background: var(--color-success-bg);
+}
+
+.speech-capture__hint {
+  margin-bottom: var(--space-md);
+  font-size: var(--text-body-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.speech-capture__record-button,
+.speech-capture__stop-button,
+.speech-capture__cancel-button,
+.speech-capture__upload,
+.speech-capture__reset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  width: 100%;
+  min-height: var(--button-height);
+  padding: 0 var(--space-md);
+  font: inherit;
+  font-size: var(--text-body-sm);
+  font-weight: var(--weight-semibold);
+  text-align: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--motion-fast), border-color var(--motion-fast);
+}
+
+.speech-capture__record-button {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+}
+
+.speech-capture__record-button:hover {
+  background: var(--color-accent-hover);
+}
+
+.speech-capture__stop-button {
+  color: var(--color-on-accent);
+  background: var(--color-danger-solid);
+}
+
+.speech-capture__cancel-button,
+.speech-capture__upload,
+.speech-capture__reset {
+  color: var(--color-text);
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+}
+
+.speech-capture__cancel-button:hover,
+.speech-capture__upload:hover,
+.speech-capture__reset:hover {
+  background: var(--color-surface-hover);
+}
+
+.speech-capture__actions {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.speech-capture__or {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-muted);
+}
+
+.speech-capture__or::before,
+.speech-capture__or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.speech-capture__timer {
+  margin: var(--space-sm) 0;
+  font-size: var(--p-font-30);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.speech-capture__waveform {
+  height: 4.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  margin-bottom: var(--space-md);
+  overflow: hidden;
+}
+
+.speech-capture__waveform span {
+  width: 4px;
+  min-height: 6px;
+  border-radius: 4px;
+  background: var(--color-accent);
+  transition: height 80ms linear;
+}
+
+.speech-capture__processing {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-lg) 0;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.speech-capture__spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid var(--color-border-strong);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.speech-capture__done {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) 0;
+  text-align: center;
+}
+
+.speech-capture__check {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  font-size: 1.4rem;
+  color: var(--color-success-fg);
+  background: var(--color-success-bg);
+  border-radius: 50%;
+}
+
+.speech-capture__done p {
+  font-size: var(--text-small);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.speech-capture__error,
+.mri-upload__error {
+  margin: var(--space-sm) 0 0;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-small);
+  color: var(--color-danger-fg);
+  background: var(--color-danger-bg);
+  border-radius: var(--radius-sm);
+}
+
+.speech-capture__warning {
+  margin: 0 0 var(--space-md);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-small);
+  color: var(--color-warning-fg);
+  background: var(--color-warning-bg);
+  border-radius: var(--radius-sm);
+}

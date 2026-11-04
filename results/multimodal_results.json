@@ -1,39 +1,42 @@
 {
-  "dataset": "multimodal_dementia_dataset.csv (synthetic)",
-  "n_patients": 225,
-  "n_features_total": 27,
+  "dataset": "multimodal_dementia_dataset.csv (real: OASIS clinical/MRI x windowed speech, matched by label/sex/age)",
+  "n_patients": 233,
+  "n_features_total": 24,
   "n_features_per_mod": {
-    "clinical": 5,
-    "mri": 4,
+    "clinical": 4,
+    "mri": 2,
     "speech": 18
   },
   "pca_components": 2,
   "qsvm_feature_dim": 6,
   "cv_folds": 5,
+  "cv": "GroupKFold(5) composite (speaker_id|oasis_subject_id)",
   "clean_cv": {
     "svm": {
-      "mean": 1.0,
-      "std": 0.0
+      "mean": 0.8114,
+      "std": 0.0301
     },
     "qsvm": {
-      "mean": 0.9911,
-      "std": 0.0178
+      "mean": 0.7814,
+      "std": 0.0777
     }
   },
   "noisy_cv": {
     "svm": {
-      "mean": 0.9422,
+      "mean": 0.8114,
       "std": 0.0301
     },
     "qsvm": {
-      "mean": 0.8667,
-      "std": 0.0562
-    }
+      "mean": 0.7814,
+      "std": 0.0777
+    },
+    "sigma_frac_used": 0
   },
-  "noise_config": {
-    "sigma_frac": 1.5,
-    "scaling": "per-feature std (X[:,j] += N(0, sigma_frac * std_j))",
-    "note": "noise applied to synthetic training data only \u2014 do not apply to real inference"
+  "match_counts": {
+    "n_distinct_speakers": 53,
+    "n_distinct_oasis_subjects": 233,
+    "n_oasis_pool_total": 385,
+    "n_oasis_unmatched": 152
   },
   "published_baselines": {
     "akinrotimi_qsvm_base": 0.9125,

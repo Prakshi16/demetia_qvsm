@@ -19,10 +19,8 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { api } from "../api/client";
-
-// Same fixed scale as the screening form (0, 0.5, 1, 2, 3). The model was
-// trained on {0, 0.5, 1, 2}; 3 (severe) is still a valid rating to record.
-const CDR_OPTIONS = ["0", "0.5", "1", "2", "3"];
+import NumberField from "../components/ui/NumberField";
+import { CDR_OPTIONS, CLINICAL_RULES, validateChoice, validateWholeNumber } from "../utils/validate";
 
 function toNumberOrNull(value) {
   const trimmed = String(value).trim();
@@ -44,6 +42,17 @@ export default function NewVisitFollowUp() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [formError, setFormError] = useState("");
+  const [touched, setTouched] = useState({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
+  const errors = {
+    mmse: validateWholeNumber(mmse, CLINICAL_RULES.mmse),
+    cdr: validateChoice(cdr, { label: "CDR", options: CDR_OPTIONS }),
+  };
+  const values = { mmse, cdr };
+  // "required" waits for submit; format/range errors show on blur.
+  const shownError = (name) =>
+    ((submitAttempted || (touched[name] && String(values[name]).trim() !== "")) && errors[name]) || undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +82,8 @@ export default function NewVisitFollowUp() {
   async function handleSubmit(event) {
     event.preventDefault();
     setFormError("");
+    setSubmitAttempted(true);
+    if (errors.mmse || errors.cdr) return;
     setIsSubmitting(true);
 
     try {
@@ -158,30 +169,30 @@ export default function NewVisitFollowUp() {
       </header>
 
       <section className="visit-card">
-        <form className="visit-form" onSubmit={handleSubmit}>
+        <form className="visit-form" onSubmit={handleSubmit} noValidate>
           <div className="visit-form-row">
-            <label className="field">
-              <span className="field-label">MMSE</span>
-              <input
-                type="number"
-                min="0"
-                max="30"
-                step="1"
-                value={mmse}
-                onChange={(event) => setMmse(event.target.value)}
-                required
-                disabled={isSubmitting}
-              />
-              <span className="field-hint">0–30.</span>
-            </label>
+            <NumberField
+              label="MMSE"
+              name="mmse"
+              value={mmse}
+              onChange={setMmse}
+              onBlur={() => setTouched((current) => ({ ...current, mmse: true }))}
+              min={CLINICAL_RULES.mmse.min}
+              max={CLINICAL_RULES.mmse.max}
+              hint="Whole number, 0–30."
+              error={shownError("mmse")}
+              disabled={isSubmitting}
+            />
 
             <label className="field">
               <span className="field-label">CDR</span>
               <select
                 value={cdr}
                 onChange={(event) => setCdr(event.target.value)}
+                onBlur={() => setTouched((current) => ({ ...current, cdr: true }))}
                 required
                 disabled={isSubmitting}
+                aria-invalid={shownError("cdr") ? "true" : undefined}
               >
                 <option value="">Select…</option>
                 {CDR_OPTIONS.map((option) => (
@@ -191,6 +202,9 @@ export default function NewVisitFollowUp() {
                 ))}
               </select>
               <span className="field-hint">Clinical Dementia Rating.</span>
+              {shownError("cdr") ? (
+                <span className="field-error" role="alert">{shownError("cdr")}</span>
+              ) : null}
             </label>
           </div>
 

@@ -40,6 +40,7 @@ export default function SpeechCapture({ visitId, onDone }) {
   const [status, setStatus] = useState(STATUS.IDLE);
   const [timer, setTimer] = useState(0);
   const [error, setError] = useState("");
+  const [micWarning, setMicWarning] = useState("");
   const [fileName, setFileName] = useState("");
   const [waveform, setWaveform] = useState(
     Array.from({ length: 32 }, () => 8)
@@ -52,6 +53,9 @@ export default function SpeechCapture({ visitId, onDone }) {
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const animationRef = useRef(null);
+  // Set when the user cancels mid-recording so recorder.onstop drops the take
+  // instead of uploading it.
+  const discardedRef = useRef(false);
 
   const inputId = `speech-upload-${String(visitId || "new").replace(
     /[^a-zA-Z0-9_-]/g,
@@ -110,9 +114,16 @@ export default function SpeechCapture({ visitId, onDone }) {
       }
 
       const audioContext = new AudioContext();
+      // Browsers create an AudioContext in "suspended" state unless it's inside
+      // a user gesture; by the time we get here getUserMedia has already
+      // awaited, so resume it explicitly or the analyser only ever reads zeros.
+      if (audioContext.state === "suspended") {
+        audioContext.resume().catch(() => {});
+      }
       const analyser = audioContext.createAnalyser();
 
-      analyser.fftSize = 64;
+      analyser.fftSize = 128;
+      analyser.smoothingTimeConstant = 0.6;
 
       const source = audioContext.createMediaStreamSource(stream);
       source.connect(analyser);
@@ -121,6 +132,8 @@ export default function SpeechCapture({ visitId, onDone }) {
       analyserRef.current = analyser;
 
       const data = new Uint8Array(analyser.frequencyBinCount);
+      let framesSeen = 0;
+      let peakSeen = 0;
 
       function draw() {
         if (!analyserRef.current) {
@@ -129,12 +142,26 @@ export default function SpeechCapture({ visitId, onDone }) {
 
         analyser.getByteFrequencyData(data);
 
+        let frameMax = 0;
         const bars = Array.from({ length: 32 }, (_, index) => {
           const value = data[index % data.length] || 0;
+          if (value > frameMax) frameMax = value;
           return Math.max(6, Math.round(value / 4));
         });
-
         setWaveform(bars);
+
+        // If ~2s in nothing has registered, the mic is delivering silence —
+        // recording will produce an inaudible file, so say so now.
+        peakSeen = Math.max(peakSeen, frameMax);
+        framesSeen += 1;
+        if (framesSeen === 120 && peakSeen < 4) {
+          setMicWarning(
+            "No sound is reaching the microphone. Check your system input " +
+              "device and that another app (Zoom, Teams, …) isn’t using it, " +
+              "then cancel and re-record.",
+          );
+        }
+
         animationRef.current = requestAnimationFrame(draw);
       }
 
@@ -221,6 +248,7 @@ export default function SpeechCapture({ visitId, onDone }) {
 
   async function startRecording() {
     setError("");
+    setMicWarning("");
 
     if (!visitId) {
       setError("A visit ID is required before recording speech.");
@@ -239,11 +267,36 @@ export default function SpeechCapture({ visitId, onDone }) {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       });
 
       streamRef.current = stream;
       chunksRef.current = [];
+
+      // Surfaces which mic the browser actually chose — invaluable when a
+      // recording comes out silent (wrong default device is the usual cause).
+      const track = stream.getAudioTracks()[0];
+      if (track) {
+        // eslint-disable-next-line no-console
+        console.info(
+          "[SpeechCapture] mic:",
+          track.label || "(unnamed)",
+          "| muted:",
+          track.muted,
+          "| enabled:",
+          track.enabled,
+          track.getSettings?.() ?? {},
+        );
+        if (track.muted) {
+          setMicWarning(
+            "The selected microphone is muted at the system level.",
+          );
+        }
+      }
 
       const mimeTypes = [
         "audio/webm;codecs=opus",
@@ -271,6 +324,15 @@ export default function SpeechCapture({ visitId, onDone }) {
         stopTimer();
         stopWaveform();
         stopTracks();
+
+        // Cancelled mid-take: bin the audio, back to the start.
+        if (discardedRef.current) {
+          discardedRef.current = false;
+          chunksRef.current = [];
+          setTimer(0);
+          setStatus(STATUS.IDLE);
+          return;
+        }
 
         const mimeType = recorder.mimeType || "audio/webm";
 
@@ -328,6 +390,27 @@ export default function SpeechCapture({ visitId, onDone }) {
     }
   }
 
+  // Discard the current take without uploading — for when the patient fumbles a
+  // word and wants to start over.
+  function cancelRecording() {
+    setError("");
+    setMicWarning("");
+    const recorder = mediaRecorderRef.current;
+
+    if (recorder && recorder.state !== "inactive") {
+      discardedRef.current = true;
+      recorder.stop(); // onstop sees the flag and resets instead of uploading
+      return;
+    }
+
+    stopTimer();
+    stopWaveform();
+    stopTracks();
+    chunksRef.current = [];
+    setTimer(0);
+    setStatus(STATUS.IDLE);
+  }
+
   function handleFileChange(event) {
     const file = event.target.files?.[0];
 
@@ -350,11 +433,11 @@ export default function SpeechCapture({ visitId, onDone }) {
     setTimer(0);
     setFileName("");
     setError("");
+    setMicWarning("");
   }
 
   return (
     <section className="speech-capture" aria-busy={isBusy}>
-      <style>{styles}</style>
 
       <div className="speech-capture__card">
         <div className="speech-capture__header">
@@ -416,13 +499,28 @@ export default function SpeechCapture({ visitId, onDone }) {
               ))}
             </div>
 
-            <button
-              type="button"
-              className="speech-capture__stop-button"
-              onClick={stopRecording}
-            >
-              ■ Stop Recording
-            </button>
+            {micWarning && (
+              <p className="speech-capture__warning" role="alert">
+                {micWarning}
+              </p>
+            )}
+
+            <div className="speech-capture__actions">
+              <button
+                type="button"
+                className="speech-capture__stop-button"
+                onClick={stopRecording}
+              >
+                ■ Stop &amp; use
+              </button>
+              <button
+                type="button"
+                className="speech-capture__cancel-button"
+                onClick={cancelRecording}
+              >
+                Cancel &amp; re-record
+              </button>
+            </div>
           </>
         )}
 
@@ -460,180 +558,3 @@ export default function SpeechCapture({ visitId, onDone }) {
     </section>
   );
 }
-
-const styles = `
-.speech-capture {
-  width: 100%;
-  max-width: 34rem;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-.speech-capture__card {
-  padding: 1.5rem;
-  border: 1px solid #cbd5e1;
-  border-radius: 12px;
-  background: #f8fafc;
-}
-
-.speech-capture__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-}
-
-.speech-capture__header h3 {
-  margin: 0;
-  color: #0f172a;
-}
-
-.speech-capture__status {
-  padding: 0.25rem 0.6rem;
-  border-radius: 999px;
-  background: #e2e8f0;
-  color: #475569;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.speech-capture__hint {
-  color: #475569;
-  text-align: center;
-}
-
-.speech-capture__record-button,
-.speech-capture__stop-button,
-.speech-capture__upload,
-.speech-capture__reset {
-  width: 100%;
-  padding: 0.8rem 1rem;
-  border: 0;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  font-weight: 700;
-  cursor: pointer;
-  text-align: center;
-  box-sizing: border-box;
-}
-
-.speech-capture__record-button {
-  background: #2563eb;
-  color: white;
-}
-
-.speech-capture__record-button:hover {
-  background: #1d4ed8;
-}
-
-.speech-capture__stop-button {
-  background: #dc2626;
-  color: white;
-}
-
-.speech-capture__stop-button:hover {
-  background: #b91c1c;
-}
-
-.speech-capture__upload {
-  display: block;
-  background: #e2e8f0;
-  color: #0f172a;
-}
-
-.speech-capture__upload:hover {
-  background: #cbd5e1;
-}
-
-.speech-capture__or {
-  margin: 0.8rem 0;
-  color: #64748b;
-  text-align: center;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.speech-capture__timer {
-  margin: 1rem 0;
-  font-size: 2rem;
-  font-weight: 700;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
-.speech-capture__waveform {
-  height: 5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  margin-bottom: 1.5rem;
-  overflow: hidden;
-}
-
-.speech-capture__waveform span {
-  width: 4px;
-  min-height: 6px;
-  border-radius: 4px;
-  background: #2563eb;
-  transition: height 80ms linear;
-}
-
-.speech-capture__processing {
-  padding: 2rem 0;
-  text-align: center;
-  color: #475569;
-}
-
-.speech-capture__spinner {
-  width: 2rem;
-  height: 2rem;
-  margin: 0 auto 1rem;
-  border: 3px solid #cbd5e1;
-  border-top-color: #2563eb;
-  border-radius: 50%;
-  animation: speech-spin 0.8s linear infinite;
-}
-
-@keyframes speech-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.speech-capture__done {
-  padding: 1rem 0;
-  text-align: center;
-}
-
-.speech-capture__check {
-  width: 3rem;
-  height: 3rem;
-  margin: 0 auto 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: #dcfce7;
-  color: #166534;
-  font-size: 1.5rem;
-}
-
-.speech-capture__done p {
-  color: #64748b;
-  font-size: 0.9rem;
-}
-
-.speech-capture__reset {
-  margin-top: 0.75rem;
-  background: #e2e8f0;
-  color: #0f172a;
-}
-
-.speech-capture__error {
-  margin: 1rem 0 0;
-  color: #b91c1c;
-  font-size: 0.9rem;
-  line-height: 1.45;
-}
-`;

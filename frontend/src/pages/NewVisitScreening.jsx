@@ -21,14 +21,33 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { api } from "../api/client";
+import MriExtractionNote from "../components/MriExtractionNote";
 import MriUpload from "../components/MriUpload";
+import PredictionPanel from "../components/PredictionPanel";
 import SpeechCapture from "../components/SpeechCapture";
+import NumberField from "../components/ui/NumberField";
+import {
+  CDR_OPTIONS,
+  CLINICAL_RULES,
+  SES_OPTIONS,
+  validateChoice,
+  validateWholeNumber,
+} from "../utils/validate";
 
-// CDR is a fixed clinical scale (0, 0.5, 1, 2, 3). A select rather than a free
-// number field so only real scale points get through. The model was trained on
-// {0, 0.5, 1, 2}; a 3 (severe) is scaled past the training range, but it's a
-// valid clinical rating and the clinician needs to be able to record it.
-const CDR_OPTIONS = ["0", "0.5", "1", "2", "3"];
+// CDR and SES are fixed ordinal scales, so they're selects: only real scale
+// points can be chosen. MMSE and education are whole numbers in a range, typed
+// into a digits-only field. The API enforces the same rules (schemas.py).
+const SES_VALUES = SES_OPTIONS.map((option) => option.value);
+
+function validateClinical(form) {
+  const errors = {
+    mmse: validateWholeNumber(form.mmse, CLINICAL_RULES.mmse),
+    cdr: validateChoice(form.cdr, { label: "CDR", options: CDR_OPTIONS }),
+    edu: validateWholeNumber(form.edu, CLINICAL_RULES.edu),
+    ses: validateChoice(form.ses, { label: "socioeconomic status", options: SES_VALUES }),
+  };
+  return Object.fromEntries(Object.entries(errors).filter(([, message]) => message));
+}
 
 const EMPTY_FORM = { mmse: "", cdr: "", edu: "", ses: "" };
 
@@ -55,6 +74,14 @@ export default function NewVisitScreening() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [formError, setFormError] = useState("");
+  // Per-field errors, shown once a field is left (blur) or on submit.
+  const [touched, setTouched] = useState({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  // Re-showing the upload widget for a modality that's already "done", so a
+  // receptionist who picked the wrong file can replace it. Reset back to false
+  // once the replacement upload succeeds (handleUploadDone below).
+  const [replacingMri, setReplacingMri] = useState(false);
+  const [replacingSpeech, setReplacingSpeech] = useState(false);
 
   // Load the patient, and the in-progress visit if we were sent back to finish
   // one. Both are read-only lookups, so a failure here is fatal to the screen
@@ -84,10 +111,10 @@ export default function NewVisitScreening() {
           } else {
             setVisit(loadedVisit);
             setForm({
-              mmse: loadedVisit.mmse ?? "",
+              mmse: loadedVisit.mmse == null ? "" : String(loadedVisit.mmse),
               cdr: loadedVisit.cdr == null ? "" : String(loadedVisit.cdr),
-              edu: loadedVisit.edu ?? "",
-              ses: loadedVisit.ses ?? "",
+              edu: loadedVisit.edu == null ? "" : String(loadedVisit.edu),
+              ses: loadedVisit.ses == null ? "" : String(loadedVisit.ses),
             });
           }
         }
@@ -111,6 +138,8 @@ export default function NewVisitScreening() {
   async function handleCreateVisit(event) {
     event.preventDefault();
     setFormError("");
+    setSubmitAttempted(true);
+    if (Object.keys(validateClinical(form)).length > 0) return;
     setIsSubmitting(true);
 
     try {
@@ -164,10 +193,23 @@ export default function NewVisitScreening() {
     );
   }
 
+  const fieldErrors = validateClinical(form);
+  // Format/range errors show when a field is left; a "required" error on an
+  // empty field waits for submit, so it can't appear (and shift the Save
+  // button) the moment someone tabs past a field they haven't reached yet.
+  const shownError = (name) =>
+    submitAttempted || (touched[name] && String(form[name]).trim() !== "")
+      ? fieldErrors[name]
+      : undefined;
+  const markTouched = (name) => () => setTouched((current) => ({ ...current, [name]: true }));
+
   const isClinicalSaved = Boolean(visit);
   const mriDone = visit?.mri_status === "done";
   const speechDone = visit?.speech_status === "done";
   const hasPrediction = Boolean(visit?.model_prediction);
+  // Matches the backend guard in mri_upload.py/speech.py: once a diagnosis is saved,
+  // re-upload is refused outright, so don't offer "Replace file" past that point.
+  const canReplaceUploads = visit?.status !== "reviewed";
 
   return (
     <div className="page visit-page">
@@ -221,30 +263,30 @@ export default function NewVisitScreening() {
             </div>
           </dl>
         ) : (
-          <form className="visit-form" onSubmit={handleCreateVisit}>
+          <form className="visit-form" onSubmit={handleCreateVisit} noValidate>
             <div className="visit-form-row">
-              <label className="field">
-                <span className="field-label">MMSE</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="30"
-                  step="1"
-                  value={form.mmse}
-                  onChange={(event) => updateField("mmse", event.target.value)}
-                  required
-                  disabled={isSubmitting}
-                />
-                <span className="field-hint">0–30. Model trained on 12–30.</span>
-              </label>
+              <NumberField
+                label="MMSE"
+                name="mmse"
+                value={form.mmse}
+                onChange={(value) => updateField("mmse", value)}
+                onBlur={markTouched("mmse")}
+                min={CLINICAL_RULES.mmse.min}
+                max={CLINICAL_RULES.mmse.max}
+                hint="Whole number, 0–30. The model was trained on 12–30."
+                error={shownError("mmse")}
+                disabled={isSubmitting}
+              />
 
               <label className="field">
                 <span className="field-label">CDR</span>
                 <select
                   value={form.cdr}
                   onChange={(event) => updateField("cdr", event.target.value)}
+                  onBlur={markTouched("cdr")}
                   required
                   disabled={isSubmitting}
+                  aria-invalid={shownError("cdr") ? "true" : undefined}
                 >
                   <option value="">Select…</option>
                   {CDR_OPTIONS.map((option) => (
@@ -253,39 +295,48 @@ export default function NewVisitScreening() {
                     </option>
                   ))}
                 </select>
-                <span className="field-hint">Clinical Dementia Rating.</span>
+                <span className="field-hint">Clinical Dementia Rating. Recorded, not a model input.</span>
+                {shownError("cdr") ? (
+                  <span className="field-error" role="alert">{shownError("cdr")}</span>
+                ) : null}
               </label>
             </div>
 
             <div className="visit-form-row">
-              <label className="field">
-                <span className="field-label">Education (years)</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="30"
-                  step="1"
-                  value={form.edu}
-                  onChange={(event) => updateField("edu", event.target.value)}
-                  required
-                  disabled={isSubmitting}
-                />
-                <span className="field-hint">Model trained on 6–21.</span>
-              </label>
+              <NumberField
+                label="Education (years)"
+                name="edu"
+                value={form.edu}
+                onChange={(value) => updateField("edu", value)}
+                onBlur={markTouched("edu")}
+                min={CLINICAL_RULES.edu.min}
+                max={CLINICAL_RULES.edu.max}
+                hint="Whole years of schooling, 0–30. The model was trained on 6–23."
+                error={shownError("edu")}
+                disabled={isSubmitting}
+              />
 
               <label className="field">
                 <span className="field-label">Socioeconomic status</span>
-                <input
-                  type="number"
-                  min="1"
-                  max="5"
-                  step="1"
+                <select
                   value={form.ses}
                   onChange={(event) => updateField("ses", event.target.value)}
+                  onBlur={markTouched("ses")}
                   required
                   disabled={isSubmitting}
-                />
-                <span className="field-hint">1–5.</span>
+                  aria-invalid={shownError("ses") ? "true" : undefined}
+                >
+                  <option value="">Select…</option>
+                  {SES_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="field-hint">Hollingshead index, 1 (highest) to 5 (lowest).</span>
+                {shownError("ses") ? (
+                  <span className="field-error" role="alert">{shownError("ses")}</span>
+                ) : null}
               </label>
             </div>
 
@@ -319,19 +370,56 @@ export default function NewVisitScreening() {
           <div className="visit-uploads">
             <div className="visit-upload-slot">
               <h3>MRI scan</h3>
-              {mriDone ? (
-                <p className="visit-done">Features extracted ✓</p>
+              {mriDone && !replacingMri ? (
+                <>
+                <div className="visit-done-row">
+                  <p className="visit-done">Features extracted ✓</p>
+                  {canReplaceUploads ? (
+                    <button
+                      type="button"
+                      className="button-quiet"
+                      onClick={() => setReplacingMri(true)}
+                    >
+                      Wrong file? Replace
+                    </button>
+                  ) : null}
+                </div>
+                <MriExtractionNote visit={visit} />
+                </>
               ) : (
-                <MriUpload visitId={visit.id} onDone={handleUploadDone} />
+                <MriUpload
+                  visitId={visit.id}
+                  onDone={(updated) => {
+                    handleUploadDone(updated);
+                    setReplacingMri(false);
+                  }}
+                />
               )}
             </div>
 
             <div className="visit-upload-slot">
               <h3>Speech recording</h3>
-              {speechDone ? (
-                <p className="visit-done">Features extracted ✓</p>
+              {speechDone && !replacingSpeech ? (
+                <div className="visit-done-row">
+                  <p className="visit-done">Features extracted ✓</p>
+                  {canReplaceUploads ? (
+                    <button
+                      type="button"
+                      className="button-quiet"
+                      onClick={() => setReplacingSpeech(true)}
+                    >
+                      Wrong file? Replace
+                    </button>
+                  ) : null}
+                </div>
               ) : (
-                <SpeechCapture visitId={visit.id} onDone={handleUploadDone} />
+                <SpeechCapture
+                  visitId={visit.id}
+                  onDone={(updated) => {
+                    handleUploadDone(updated);
+                    setReplacingSpeech(false);
+                  }}
+                />
               )}
             </div>
           </div>
@@ -339,46 +427,26 @@ export default function NewVisitScreening() {
       </section>
 
       {/* --- Result ---------------------------------------------------- */}
-      {/* The model runs server-side inside the second upload request and takes
-          ~450 ms, so by the time that response lands the prediction is already
-          in it. Nothing to poll. */}
+      {/* Both models run server-side inside the second upload request (the
+          classical SVM in milliseconds, the QSVM research view in ~0.5 s), so
+          by the time that response lands both predictions are in it. Nothing
+          to poll. */}
       {hasPrediction ? (
-        <section className="visit-card visit-card--result">
-          <div className="visit-card-head">
-            <h2>3. Model output</h2>
-            <span className="visit-chip visit-chip--done">Sent for review</span>
+        <PredictionPanel
+          visit={visit}
+          title="3. Model output"
+          badge={<span className="badge badge--success">Sent for review</span>}
+        >
+          <div className="visit-form-actions" style={{ marginTop: "var(--space-lg)" }}>
+            <button
+              type="button"
+              className="button-primary"
+              onClick={() => navigate(`/visits/${visit.id}`)}
+            >
+              View visit detail
+            </button>
           </div>
-
-          <div className="visit-predictions">
-            <div className="visit-prediction">
-              <p className="visit-prediction-label">Quantum SVM</p>
-              <p className="visit-prediction-value">{visit.model_prediction}</p>
-              {/* NOT a probability: QSVC has no predict_proba, so this is the
-                  distance from the decision boundary. Never render it as a
-                  percentage or a bar. */}
-              <p className="visit-prediction-margin">
-                margin {visit.model_confidence?.toFixed(2) ?? "—"}
-              </p>
-            </div>
-
-            <div className="visit-prediction">
-              <p className="visit-prediction-label">Classical SVM</p>
-              <p className="visit-prediction-value">{visit.svm_prediction ?? "—"}</p>
-              <p className="visit-prediction-margin">
-                margin {visit.svm_confidence?.toFixed(2) ?? "—"}
-              </p>
-              <p className="visit-note">Research comparison only.</p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className="button-primary"
-            onClick={() => navigate(`/visits/${visit.id}`)}
-          >
-            View visit detail
-          </button>
-        </section>
+        </PredictionPanel>
       ) : null}
     </div>
   );

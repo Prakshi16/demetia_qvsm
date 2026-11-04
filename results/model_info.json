@@ -1,0 +1,71 @@
+{
+  "evaluation": "GroupKFold(n_splits=5) on the composite group (Eval 2) / oasis_subject_id (Eval 1), fused 24-feature row, N=233 real patients",
+  "models": [
+    {
+      "key": "svm",
+      "name": "Classical SVM",
+      "kernel": "RBF kernel",
+      "canonical": true,
+      "metrics": {
+        "accuracy": {
+          "mean": 0.8114,
+          "std": 0.0301
+        },
+        "precision": {
+          "mean": 0.8123,
+          "std": 0.0363
+        },
+        "recall": {
+          "mean": 0.8593,
+          "std": 0.0516
+        },
+        "specificity": {
+          "mean": 0.7487,
+          "std": 0.0805
+        },
+        "f1": {
+          "mean": 0.8336,
+          "std": 0.0225
+        },
+        "roc_auc": {
+          "mean": 0.9077,
+          "std": 0.0228
+        }
+      },
+      "decision_scale": 1.8415
+    },
+    {
+      "key": "qsvm",
+      "name": "Quantum SVM",
+      "kernel": "ZZFeatureMap fidelity kernel, 6 qubits (statevector simulation)",
+      "canonical": false,
+      "metrics": {
+        "accuracy": {
+          "mean": 0.7814,
+          "std": 0.0777
+        },
+        "precision": {
+          "mean": 0.8069,
+          "std": 0.0352
+        },
+        "recall": {
+          "mean": 0.7944,
+          "std": 0.1058
+        },
+        "specificity": {
+          "mean": 0.7687,
+          "std": 0.0498
+        },
+        "f1": {
+          "mean": 0.7988,
+          "std": 0.0699
+        },
+        "roc_auc": {
+          "mean": 0.8453,
+          "std": 0.0513
+        }
+      },
+      "decision_scale": 1.4137
+    }
+  ]
+}
