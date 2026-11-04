@@ -48,7 +48,10 @@ ACCEPTED_EXTENSIONS = VOLUME_EXTENSIONS + DICOM_EXTENSIONS + IMAGE_EXTENSIONS + 
 # bomb, or a "volume" whose header claims billions of voxels.
 MAX_ARCHIVE_MEMBERS = 4000
 MAX_UNCOMPRESSED_BYTES = 600 * 1024 * 1024
-MAX_VOXELS = 512 * 512 * 512
+# 32 M voxels (~128 MB as float32) covers any structural MRI (1 mm 256^3 is
+# 16.8 M) while keeping peak memory inside a 512 MB host (Render free tier);
+# a typical raw scan peaks at ~350 MB including the loaded models.
+MAX_VOXELS = 32 * 1024 * 1024
 
 
 class ScanLoadError(ValueError):
@@ -171,7 +174,7 @@ def _finish_nibabel(image, source_format: str) -> LoadedScan:
     if len(shape) < 2:
         raise ScanLoadError("The scan has fewer than two dimensions.")
     if int(np.prod(shape[:3])) > MAX_VOXELS:
-        raise ScanLoadError("The scan is too large to process.")
+        raise ScanLoadError("The scan is too large to process (over 32 million voxels). Upload a single structural volume, or downsample it.")
 
     notes: list[str] = []
     # Reorient to the closest canonical (RAS) frame so the viewer shows it the
