@@ -1,15 +1,21 @@
-"""Turn an uploaded scan into something the browser viewer (Niivue) can render.
+"""Turn a stored MRI upload into something the browser viewer (Niivue) can render.
 
-Niivue reads NIfTI natively but has no DICOM reader, so a `.dcm` upload has to
-be decoded server-side. NIfTI / MGH files pass straight through (gzipped if they
-aren't already). The DICOM path wraps the pixel volume in a minimal NIfTI-1
-image — enough for a clinician to scroll through slices, not a substitute for a
-real conversion pipeline (dcm2niix et al.).
+Niivue reads NIfTI natively but has no DICOM, Analyze-pair or zip reader, so
+the scan is decoded server-side with the same loader the feature extractor uses
+(``mri_io.load_scan``) and re-encoded as gzip-compressed NIfTI-1. Whatever was
+accepted for feature extraction can therefore also be viewed. A NIfTI upload is
+passed through untouched (it's already what Niivue wants).
+
+A 2-D picture becomes a one-slice volume, flipped so it shows upright in
+Niivue's axial view.
 """
 from __future__ import annotations
 
 import gzip
-import io
+
+import numpy as np
+
+from app.services.mri_io import ScanLoadError, load_scan, lower_name
 
 VIEWER_MEDIA_TYPE = "application/gzip"
 VIEWER_FILENAME = "scan.nii.gz"
@@ -18,39 +24,30 @@ VIEWER_FILENAME = "scan.nii.gz"
 def to_viewer_nifti(raw: bytes, filename: str) -> bytes:
     """Return the scan as gzip-compressed NIfTI-1 bytes.
 
-    Raises ``ValueError`` if the format can't be shown in the browser.
+    Raises ``ValueError`` if the stored object can't be decoded.
     """
-    lower = filename.lower()
+    import nibabel as nib
 
-    if lower.endswith(".nii.gz"):
+    lowered = lower_name(filename)
+    if lowered.endswith(".nii.gz") and raw[:2] == b"\x1f\x8b":
         return raw
-    if lower.endswith(".nii"):
+    if lowered.endswith(".nii"):
         return gzip.compress(raw)
 
-    if lower.endswith((".mgz", ".mgh")):
-        try:
-            import nibabel as nib
+    try:
+        scan = load_scan([(filename, raw)])
+    except ScanLoadError as exc:
+        raise ValueError(str(exc)) from exc
 
-            mgh = nib.MGHImage.from_bytes(gzip.decompress(raw) if lower.endswith(".mgz") else raw)
-            return gzip.compress(nib.Nifti1Image(mgh.get_fdata(), mgh.affine).to_bytes())
-        except Exception as exc:  # noqa: BLE001
-            raise ValueError("Could not convert this MGH scan for viewing.") from exc
-
-    if lower.endswith((".dcm", ".dicom")):
-        try:
-            import nibabel as nib
-            import numpy as np
-            import pydicom
-
-            ds = pydicom.dcmread(io.BytesIO(raw))
-            volume = np.asarray(ds.pixel_array).astype(np.float32)
-            if volume.ndim == 2:
-                volume = volume[:, :, None]
-            spacing = [float(v) for v in getattr(ds, "PixelSpacing", [1.0, 1.0])]
-            thickness = float(getattr(ds, "SliceThickness", 1.0) or 1.0)
-            affine = np.diag([spacing[0], spacing[1], thickness, 1.0])
-            return gzip.compress(nib.Nifti1Image(volume, affine).to_bytes())
-        except Exception as exc:  # noqa: BLE001
-            raise ValueError("Could not decode this DICOM file for viewing.") from exc
-
-    raise ValueError(f"'{filename}' can't be shown in the in-browser viewer.")
+    if scan.is_volume:
+        if scan.affine is not None:
+            affine = scan.affine
+        else:
+            affine = np.diag([*(scan.spacing or (1.0, 1.0, 1.0)), 1.0])
+        image = nib.Nifti1Image(scan.data.astype(np.float32), affine)
+    else:
+        # (rows, cols) picture -> (x, y, 1) with y pointing up.
+        data = np.flipud(scan.data).T[:, :, None].astype(np.float32)
+        spacing = scan.spacing or (1.0, 1.0)
+        image = nib.Nifti1Image(data, np.diag([spacing[1], spacing[0], 1.0, 1.0]))
+    return gzip.compress(image.to_bytes())
