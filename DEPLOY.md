@@ -61,7 +61,12 @@ Nothing secret lives in this repo. Every secret is pasted into a dashboard, neve
 
 **Free-tier behaviour to know before a demo:** the service sleeps after 15 minutes idle, and the
 first request after that takes about a minute while it wakes. Open the `/health` URL a couple of
-minutes before presenting. Memory is 512 MB; measured peak for a large raw MRI upload with both
+minutes before presenting. **CPU is 0.1 of a core**, which shapes speech uploads. librosa's kernels are
+pre-compiled into the image at build time, so a cold start no longer spends ~5 minutes compiling
+on the first upload (measured: 334 s → 50 s, and the server absorbs that 50 s in a background
+warm-up right after boot). After that, extraction runs at about 2 s per second of audio: a 30 s
+recording takes roughly a minute. For a live demo, keep recordings around 15–30 s, or switch the
+service to a paid instance for more CPU. Memory is 512 MB; measured peak for a large raw MRI upload with both
 models loaded is ~350 MB, and uploads over 32 M voxels are refused with a clear message.
 
 ## 3. Vercel: the frontend

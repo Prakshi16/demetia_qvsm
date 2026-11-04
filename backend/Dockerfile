@@ -41,6 +41,14 @@ COPY results/qsvm_model.pkl results/svm_model.pkl results/mri_extractor_calibrat
 # build (Render) it's the actual source.
 COPY backend/ .
 
+# Pre-compile librosa's numba kernels into the image. A cold container otherwise
+# spends minutes JIT-compiling on its first speech upload (3 min 45 s measured on
+# Render's free 0.1-CPU instance, long enough for the proxy to drop the request).
+# NUMBA_CPU_NAME=generic makes the cached machine code valid on any x86-64 host,
+# since the image is built on one machine and run on another.
+ENV NUMBA_CACHE_DIR=/opt/numba-cache NUMBA_CPU_NAME=generic
+RUN mkdir -p /opt/numba-cache && python scripts/warm_speech_cache.py
+
 EXPOSE 8000
 
 # Render injects $PORT and it is not always 8000, so bind to it when present.
