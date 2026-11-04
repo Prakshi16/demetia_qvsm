@@ -19,6 +19,7 @@ import subprocess
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 from supabase import create_client
 
@@ -153,7 +154,12 @@ async def upload_speech(
 
     storage_path = f"speech/{visit_id}/{filename}"
 
-    client.storage.from_(settings.SUPABASE_BUCKET).upload(
+    # Everything below is blocking (network I/O, ffmpeg, librosa, two models).
+    # It runs on the threadpool so the event loop stays free: on a slow host,
+    # running it inline starved the /health check and the platform restarted
+    # the instance mid-request (502).
+    await run_in_threadpool(
+        client.storage.from_(settings.SUPABASE_BUCKET).upload,
         storage_path,
         file_bytes,
         {
@@ -167,12 +173,12 @@ async def upload_speech(
     # Extract speech features
     # ------------------------------------------------------------------
     audio_bytes = (
-        _to_wav(file_bytes)
+        await run_in_threadpool(_to_wav, file_bytes)
         if extension in TRANSCODE_EXTENSIONS
         else file_bytes
     )
 
-    features = extract_speech_features(io.BytesIO(audio_bytes))
+    features = await run_in_threadpool(extract_speech_features, io.BytesIO(audio_bytes))
 
     if len(features) != 18:
         raise HTTPException(
@@ -194,7 +200,7 @@ async def upload_speech(
     if visit.model_prediction is not None:
         clear_stale_prediction(visit)
 
-    check_and_run_prediction(db, visit)
+    await run_in_threadpool(check_and_run_prediction, db, visit)
 
     db.commit()
     db.refresh(visit)

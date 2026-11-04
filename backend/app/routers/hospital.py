@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 from supabase import create_client
 
@@ -94,7 +95,8 @@ async def upload_logo(
     bucket = client.storage.from_(settings.SUPABASE_PUBLIC_BUCKET)
     storage_path = f"hospital-logos/{hospital.id}/logo{extension}"
     try:
-        bucket.upload(
+        await run_in_threadpool(
+            bucket.upload,
             storage_path,
             file_bytes,
             {

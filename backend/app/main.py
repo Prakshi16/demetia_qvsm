@@ -6,6 +6,7 @@ later passes and mounted onto `api_router` here.
 """
 import logging
 import math
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, Depends, FastAPI, Request
@@ -55,7 +56,36 @@ async def lifespan(_: FastAPI):
     """
     global _models_ready
     _models_ready = warm_models()
+    # Speech extraction pays a one-off librosa/numba JIT cost on first use, which
+    # is slow on a small host. Pay it in the background now so the first real
+    # upload doesn't, and so startup (and the platform's health check) never waits.
+    threading.Thread(target=_warm_speech_extractor, daemon=True).start()
     yield
+
+
+def _warm_speech_extractor() -> None:
+    try:
+        import io
+        import wave
+
+        import numpy as np
+
+        from app.services.speech_features import extract_speech_features
+
+        rate = 16000
+        t = np.linspace(0, 1.0, rate, endpoint=False)
+        tone = (0.3 * np.sin(2 * np.pi * 140 * t) * 32767).astype(np.int16)
+        buffer = io.BytesIO()
+        with wave.open(buffer, "wb") as handle:
+            handle.setnchannels(1)
+            handle.setsampwidth(2)
+            handle.setframerate(rate)
+            handle.writeframes(tone.tobytes())
+        buffer.seek(0)
+        extract_speech_features(buffer)
+        logging.getLogger(__name__).info("Speech extractor warmed up")
+    except Exception:  # noqa: BLE001 - warm-up is best effort
+        logging.getLogger(__name__).exception("Speech extractor warm-up failed (non-fatal)")
 
 
 app = FastAPI(title="Cortex Health Portal API", version="0.1.0", lifespan=lifespan)
