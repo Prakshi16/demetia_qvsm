@@ -23,6 +23,10 @@ import { Link, useParams } from "react-router-dom";
 
 import { api } from "../api/client";
 import { useAuth } from "../auth/useAuth";
+import MriExtractionNote from "../components/MriExtractionNote";
+import PredictionPanel from "../components/PredictionPanel";
+
+const NOTES_MAX = 4000;
 
 // ~1-2 MB of WebGL viewer — only pulled when a clinician actually opens a scan.
 const ScanViewer = lazy(() => import("../components/ScanViewer"));
@@ -327,6 +331,7 @@ export default function VisitDetail() {
               <dt>MRI scan</dt>
               <dd>
                 {MODALITY_LABELS[visit.mri_status] ?? visit.mri_status}
+                {visit.mri_status === "done" ? <MriExtractionNote visit={visit} /> : null}
                 {visit.mri_status === "done" ? (
                   <div className="modality-actions no-print">
                     <button
@@ -418,32 +423,19 @@ export default function VisitDetail() {
       ) : null}
 
       {isScreening && visit.model_prediction ? (
-        <section className="visit-card visit-card--result">
-          <div className="visit-card-head">
-            <h2>Model output</h2>
-            {visit.agreement_flag ? (
+        <PredictionPanel
+          visit={visit}
+          badge={
+            visit.agreement_flag ? (
               <span
                 className={`visit-chip visit-chip--${visit.agreement_flag}`}
-                title="Whether the doctor's diagnosis matched the model. Informational only."
+                title="Whether the doctor's diagnosis matched the classical SVM (the canonical model). Informational only."
               >
                 {visit.agreement_flag === "match" ? "Doctor agreed" : "Doctor disagreed"}
               </span>
-            ) : null}
-          </div>
-
-          <div className="visit-predictions">
-            <div className="visit-prediction">
-              <p className="visit-prediction-label">Classical SVM</p>
-              <p className="visit-prediction-value">{visit.model_prediction}</p>
-              {/* NOT a probability: the SVM is fit with probability=False, so
-                  this is the distance from the decision boundary. Never a
-                  percentage. */}
-              <p className="visit-prediction-margin">
-                margin {visit.model_confidence?.toFixed(2) ?? "—"}
-              </p>
-            </div>
-          </div>
-        </section>
+            ) : null
+          }
+        />
       ) : null}
 
       {/* --- diagnosis: screening visits only (§6) ----------------------- */}
@@ -505,9 +497,13 @@ export default function VisitDetail() {
                 <textarea
                   rows={4}
                   value={notes}
+                  maxLength={NOTES_MAX}
                   onChange={(event) => setNotes(event.target.value)}
                   disabled={isSaving}
                 />
+                <span className="field-hint">
+                  {notes.length}/{NOTES_MAX} characters
+                </span>
               </label>
 
               {saveError ? (

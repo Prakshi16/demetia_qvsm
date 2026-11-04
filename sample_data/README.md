@@ -31,6 +31,17 @@ decision the way MRI did on the old synthetic set. The QSVM is still trained and
 `multimodal_qsvm.ipynb`/`metrics_full.ipynb` for the research comparison; it just isn't wired into
 the live screening flow any more.
 
+## 2026-11-04 update: extractor v2, any MRI format, QSVM toggle
+
+- **The MRI phantoms here are now flagged, not trusted.** Extractor v2 is calibrated on real OASIS
+  scans, and these geometric phantoms sit far outside real MRI statistics. They still upload and
+  drive the flow end to end, but expect the warning *"The estimate fell outside the range seen in
+  training"* and clamped values. For a meaningful demo, upload a real T1 scan in any format the
+  app accepts: NIfTI, MGZ, an Analyze `.hdr`+`.img` pair (select both files), a DICOM file or
+  series (or a `.zip` of one), or a PNG/JPG of a single slice.
+- **Both models now run on every screening.** The Visit Detail and screening screens have a
+  Classical SVM · Quantum SVM · Compare switch. The classical SVM is still the canonical result.
+
 ## Recipes
 
 Pick one MRI + one audio, any format. These files are still synthetic phantoms (intensity/geometry

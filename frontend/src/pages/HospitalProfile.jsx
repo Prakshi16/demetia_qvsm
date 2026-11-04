@@ -12,7 +12,7 @@ import { Link } from "react-router-dom";
 
 import { api, uploadHospitalLogo } from "../api/client";
 import { useAuth } from "../auth/useAuth";
-import { validateOrgName, validatePincode } from "../utils/validate";
+import { digitsOnly, validateOrgName, validatePincode } from "../utils/validate";
 
 const ROLE_LABELS = {
   receptionist: "Receptionist",
@@ -202,8 +202,9 @@ function IdentityCard({ hospital, isAdmin, onChange }) {
               <span className="field-label">Pincode</span>
               <input
                 value={form.pincode || ""}
-                onChange={(e) => update("pincode", e.target.value)}
+                onChange={(e) => update("pincode", digitsOnly(e.target.value, 6))}
                 inputMode="numeric"
+                pattern="[0-9]{6}"
                 maxLength={6}
                 required
                 disabled={busy}

@@ -3,9 +3,11 @@
 A hospital screening app that fuses **clinical scores + MRI-derived volumetrics + speech features**
 to flag dementia risk, wrapped in a full multi-hospital clinical workflow (patient intake,
 screening/follow-up visits, clinician review, diagnosis history). Built as a capstone comparing a
-6-qubit Quantum SVM against a classical SVM baseline — **the live app serves the classical SVM**
-(see "Headline result" below for why); the QSVM remains fully trained and evaluated in the research
-notebooks for that comparison, it just isn't in the clinician-facing product any more.
+6-qubit Quantum SVM against a classical SVM baseline. **The classical SVM is the canonical
+prediction** (see "Headline result" below for why). The QSVM runs alongside it as a labelled
+*research view*: every screening screen has a Classical SVM · Quantum SVM · Compare switch that
+animates the same patient between the two models' decision axes and shows both models'
+cross-validated metrics.
 
 ## Headline result (real data, 2026-09-24) — and why the app serves the SVM, not the QSVM
 
@@ -37,12 +39,44 @@ are in `data/DATASHEET.md`.
 
 ```
 Clinical form ──┐
-MRI upload ─────┼─► per-modality StandardScaler + PCA(2) ─► concat (6-D) ─► SVC  (classical, served)
-Speech upload ──┘
-
-Research-only (multimodal_qsvm.ipynb / metrics_full.ipynb), not called by the live app:
-                same 6-D ─► MinMaxScaler ─► ZZFeatureMap(6) ─► QSVC  (quantum)
+MRI upload ─────┼─► per-modality StandardScaler + PCA(2) ─► concat (6-D) ─┬─► SVC   canonical: clinician queue + agreement flag
+Speech upload ──┘                                                        └─► MinMaxScaler ─► ZZFeatureMap(6) ─► QSVC   research view (toggle)
 ```
+
+The QSVM can never block the canonical result: if it fails or its pickle is missing, its columns
+stay empty and the toggle disables itself.
+
+### MRI: any reasonable scan
+
+The MRI upload accepts **NIfTI** (`.nii`, `.nii.gz`), **MGH/MGZ**, **Analyze** `.hdr` + `.img`
+pairs (as two files or zipped), **DICOM** (one file, a whole series as several files, or a
+`.zip`; slices are ordered by position, extensions optional), and **2-D images** of a slice
+(`.png`, `.jpg`, `.bmp`, `.tif`). Up to 50 MB.
+
+Extractor v2 (`backend/app/services/mri_features.py`) doesn't need a perfect skull strip. It
+reorients the scan, resamples it to 2 mm, and describes how much CSF-like signal sits at each
+depth below the head surface. Calibrated regressors then map that description to nWBV and eTIV.
+They were fit on 997 labelled OASIS scans of every input type (raw with skull, atlas-space,
+skull-stripped) plus 3,090 2-D slices, validated with subject-grouped 5-fold CV:
+
+| Input | nWBV error (MAE) | eTIV error (MAE) |
+|---|---|---|
+| Raw 3-D scan, skull on (OASIS-2 / OASIS-1) | 0.018 / 0.016 | 60 / 97 mL |
+| Skull-stripped 3-D | 0.013 | not recoverable (atlas-normalised) |
+| 2-D slice image | ≈0.026 | not measurable, training median used and flagged |
+| Guessing the median | 0.039 | 130 mL |
+
+Swapping the true MRI values for extracted ones keeps the SVM's label on 91% of raw scans. Every
+upload records how it was read (input kind, format, expected error, warnings), and the clinician
+sees that next to the scan. The extractor is calibrated for T1-weighted structural MRI.
+
+### Design system
+
+The frontend is plain CSS on a three-tier token system (`frontend/src/styles/`): primitives,
+then semantic light/dark roles, then component tokens, with layers for base, components,
+layout and screens. Light and dark themes (following the OS, or toggled in the nav) pass a
+WCAG AA contrast check (`npm run check:contrast`). The living reference is the in-app
+**/design-system** page.
 
 - **Backend:** FastAPI + SQLAlchemy + Supabase (Postgres + Storage + Auth), `backend/`.
 - **Frontend:** React + Vite, `frontend/`.
@@ -59,21 +93,30 @@ Research-only (multimodal_qsvm.ipynb / metrics_full.ipynb), not called by the li
    ```
    or, without Docker, `pip install -r backend/requirements.txt` and
    `uvicorn app.main:app --reload` from `backend/`. `GET /api/v1/health` should report
-   `{"status":"ok","db":"ok","model":"ok"}`.
+   `{"status":"ok","db":"ok","model":"ok","qsvm":"ok","mri_calibration":"ok"}`. Apply every
+   file in `backend/migrations/` in order (they're idempotent) before first run.
 2. **Frontend** — `cd frontend && npm install && npm run dev`.
 3. **Retrain the model** (optional — pickles are already in `results/` and baked into the Docker
    image) — see `real_dataset_setup.md` Phase 1.8-1.9, or run the notebooks in order: `clinical_qsvm.ipynb` →
    `mri_qsvm.ipynb` → `speech_qsvm.ipynb` → `multimodal_qsvm.ipynb` → `metrics_full.ipynb`, then
    `python backend/scripts/train_classical_svm.py`.
 
-## Smoke-testing a change
+## Testing a change
 
-- `pytest tests/test_build_real_dataset.py` — dataset-matcher unit tests.
+- `python -m pytest backend/tests tests` — backend unit tests (validation, MRI loaders for every
+  format, the extractor on real OASIS scans when `data/` is present, the viewer conversion, the
+  dual-model prediction seam) plus the dataset-matcher tests. No DB or network needed.
+- `cd frontend && npm test` — validator and prediction-math unit tests; `npm run lint`;
+  `npm run check:contrast` — WCAG contrast for every token pair, both themes.
 - `python scripts/verify_real_dataset.py` — the Phase 1.7 automated dataset-quality gate (schema,
   leak probe, representativeness, age QC).
 - `python backend/scripts/smoke_prediction.py` — model-serving seam, no DB required.
 - `python backend/scripts/smoke_e2e.py` — full product flow against a running API + DB (needs
-  `backend/.env` and `docker compose up`).
+  `backend/.env` and `docker compose up`), including strict numeric validation, both models, and
+  MRI uploads as NIfTI, PNG slice, Analyze pair and zipped DICOM series. Run it inside the
+  container: `docker compose exec -e PYTHONPATH=/app -w /app backend python scripts/smoke_e2e.py`.
+- After a retrain: `python backend/scripts/build_model_info.py` (refreshes the toggle's metrics
+  and axis scales) and `python scripts/calibrate_mri_extractor.py` (refits the MRI calibration).
 
 ## Key documents
 

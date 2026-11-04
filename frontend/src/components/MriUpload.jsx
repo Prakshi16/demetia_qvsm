@@ -5,6 +5,7 @@ import { useState } from "react";
 // component keeps its raw fetch and borrows the client's two constants instead
 // of hardcoding the base URL or the token key.
 import { API_BASE_URL, TOKEN_KEY } from "../api/client";
+import { PICKER_ACCEPT, validateFiles } from "../utils/mriFiles";
 
 const STATUS = {
   IDLE: "idle",
@@ -13,43 +14,9 @@ const STATUS = {
   DONE: "done",
 };
 
-const ACCEPTED_EXTENSIONS = [".nii", ".nii.gz", ".dcm", ".dicom", ".mgh", ".mgz"];
-// The native file picker matches `accept` tokens against the segment after the
-// LAST dot, so ".nii.gz" never matches a real file — the OS sees "gz" and greys
-// it out. List the trailing single extensions (plus a MIME) for the picker;
-// validateFile() still enforces the stricter compound list above.
-const PICKER_ACCEPT = ".nii,.nii.gz,.gz,.dcm,.dicom,.mgh,.mgz,application/gzip";
-// 50 MB — the Supabase free-tier per-file storage limit, matching the
-// backend's own cap so an oversized file fails here rather than mid-upload.
-const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
-
-function hasAcceptedExtension(fileName) {
-  const normalizedFileName = fileName.toLowerCase();
-  return ACCEPTED_EXTENSIONS.some((extension) => normalizedFileName.endsWith(extension));
-}
-
-function formatMegabytes(bytes) {
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function validateFile(file) {
-  if (!file) {
-    return "Select an MRI scan file.";
-  }
-
-  if (!hasAcceptedExtension(file.name)) {
-    return `Unsupported file type. Use one of: ${ACCEPTED_EXTENSIONS.join(", ")}.`;
-  }
-
-  if (file.size <= 0) {
-    return "The selected MRI file is empty.";
-  }
-
-  if (file.size > MAX_FILE_SIZE_BYTES) {
-    return `The selected file is too large. Maximum size is ${formatMegabytes(MAX_FILE_SIZE_BYTES)}.`;
-  }
-
-  return "";
+function describeSelection(files) {
+  if (files.length === 1) return files[0].name;
+  return `${files.length} files (${files.slice(0, 2).map((file) => file.name).join(", ")}${files.length > 2 ? ", …" : ""})`;
 }
 
 export default function MriUpload({ visitId, onDone }) {
@@ -62,14 +29,15 @@ export default function MriUpload({ visitId, onDone }) {
   const isBusy = status === STATUS.UPLOADING || status === STATUS.PROCESSING;
 
   const statusText = {
-    [STATUS.IDLE]: "No file uploaded",
-    [STATUS.UPLOADING]: "Uploading MRI scan...",
-    [STATUS.PROCESSING]: "Extracting imaging features",
+    [STATUS.IDLE]: "Drop an MRI scan here",
+    [STATUS.UPLOADING]: "Uploading…",
+    [STATUS.PROCESSING]: "Reading the scan and extracting features…",
     [STATUS.DONE]: "Features extracted",
   }[status];
 
-  async function uploadMriFile(file) {
-    const validationMessage = validateFile(file);
+  async function uploadMriFiles(fileList) {
+    const files = Array.from(fileList ?? []);
+    const validationMessage = validateFiles(files);
 
     if (validationMessage) {
       setError(validationMessage);
@@ -85,41 +53,55 @@ export default function MriUpload({ visitId, onDone }) {
     }
 
     const formData = new FormData();
-    formData.append("file", file);
+    if (files.length === 1) {
+      formData.append("file", files[0]);
+    } else {
+      files.forEach((file) => formData.append("files", file));
+    }
 
     setError("");
-    setFileName(file.name);
+    setFileName(describeSelection(files));
     setStatus(STATUS.UPLOADING);
 
     try {
       // Do NOT set Content-Type — the browser has to set the multipart
       // boundary itself, and overriding it breaks the upload.
-      const response = await fetch(`${API_BASE_URL}/visits/${visitId}/mri-upload`, {
+      const request = fetch(`${API_BASE_URL}/visits/${visitId}/mri-upload`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY)}`,
         },
         body: formData,
       });
-
-      setStatus(STATUS.PROCESSING);
+      // The request body is sent quickly; most of the wait is server-side
+      // extraction, so switch the label once the upload is under way.
+      const switchLabel = setTimeout(() => setStatus(STATUS.PROCESSING), 600);
+      const response = await request;
+      clearTimeout(switchLabel);
 
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(payload.detail || "MRI upload failed.");
+        const detail = Array.isArray(payload.detail)
+          ? payload.detail.map((item) => item.msg).join(", ")
+          : payload.detail;
+        throw new Error(detail || "MRI upload failed.");
       }
 
       setStatus(STATUS.DONE);
       onDone?.(payload);
     } catch (uploadError) {
-      setError(uploadError.message || "MRI upload failed. Please try again.");
+      setError(
+        uploadError instanceof TypeError
+          ? "Cannot reach the server. Is the backend running?"
+          : uploadError.message || "MRI upload failed. Please try again.",
+      );
       setStatus(STATUS.IDLE);
     }
   }
 
   function handleInputChange(event) {
-    uploadMriFile(event.target.files?.[0]);
+    uploadMriFiles(event.target.files);
     event.target.value = "";
   }
 
@@ -128,18 +110,17 @@ export default function MriUpload({ visitId, onDone }) {
     setIsDragging(false);
 
     if (!isBusy) {
-      uploadMriFile(event.dataTransfer.files?.[0]);
+      uploadMriFiles(event.dataTransfer.files);
     }
   }
 
   return (
     <section className="mri-upload" aria-busy={isBusy}>
-      <style>{styles}</style>
-
       <input
         id={inputId}
         className="mri-upload__input"
         type="file"
+        multiple
         accept={PICKER_ACCEPT}
         onChange={handleInputChange}
         disabled={isBusy}
@@ -157,14 +138,21 @@ export default function MriUpload({ visitId, onDone }) {
         onDrop={handleDrop}
         aria-disabled={isBusy}
       >
-        <span className="mri-upload__icon" aria-hidden="true">
-          +
-        </span>
-        <span className="mri-upload__status">
+        {isBusy ? (
+          <span className="spinner" aria-hidden="true" />
+        ) : (
+          <span className="mri-upload__icon" aria-hidden="true">
+            +
+          </span>
+        )}
+        <span className="mri-upload__status" aria-live="polite">
           {statusText}
           {status === STATUS.DONE ? " ✓" : ""}
         </span>
-        <span className="mri-upload__hint">Drag and drop an MRI scan here, or click to upload.</span>
+        <span className="mri-upload__hint">or click to choose. Several files are fine for one scan.</span>
+        <span className="mri-upload__formats">
+          NIfTI · MGZ · Analyze .hdr+.img · DICOM file, series or .zip · PNG/JPG slice
+        </span>
       </label>
 
       {fileName && <p className="mri-upload__file">{fileName}</p>}
@@ -177,82 +165,3 @@ export default function MriUpload({ visitId, onDone }) {
     </section>
   );
 }
-
-const styles = `
-.mri-upload {
-  width: 100%;
-  max-width: 34rem;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-.mri-upload__input {
-  display: none;
-}
-
-.mri-upload__dropzone {
-  min-height: 12rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  padding: 1.5rem;
-  border: 2px dashed #64748b;
-  border-radius: 8px;
-  background: #f8fafc;
-  color: #0f172a;
-  cursor: pointer;
-  text-align: center;
-}
-
-.mri-upload__dropzone:hover,
-.mri-upload__dropzone--dragging {
-  border-color: #2563eb;
-  background: #eff6ff;
-}
-
-.mri-upload__dropzone[aria-disabled="true"] {
-  cursor: wait;
-  opacity: 0.75;
-}
-
-.mri-upload__icon {
-  width: 2.25rem;
-  height: 2.25rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: #dbeafe;
-  color: #1d4ed8;
-  font-size: 1.75rem;
-  line-height: 1;
-}
-
-.mri-upload__status {
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.mri-upload__hint,
-.mri-upload__file,
-.mri-upload__error {
-  margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.45;
-}
-
-.mri-upload__hint,
-.mri-upload__file {
-  color: #475569;
-}
-
-.mri-upload__file,
-.mri-upload__error {
-  margin-top: 0.75rem;
-}
-
-.mri-upload__error {
-  color: #b91c1c;
-}
-`;

@@ -1,0 +1,457 @@
+/**
+ * Cortex design tokens — three tiers, references flow one way only:
+ *
+ *   1. PRIMITIVES  (--p-*)   raw values: colour ramps, the 4px spacing grid, the
+ *                            type scale, radii, shadows, motion. Never used by a
+ *                            component directly.
+ *   2. SEMANTIC    (--color-*, --space-*, --text-*, ...)
+ *                            what a value is FOR ("muted text", "warning
+ *                            surface"). This is the tier every stylesheet reads,
+ *                            and the only tier the dark theme redefines.
+ *   3. COMPONENT   (--button-*, --field-*, --card-*, --chart-*)
+ *                            only where a component needs a knob of its own.
+ *
+ * Colour rules (WCAG 2.2 AA, checked by scripts/check-contrast.mjs):
+ *   - body and muted text >= 4.5:1 on every surface they sit on;
+ *   - each status has a foreground/background pair, and status is never shown
+ *     by colour alone (always a word or icon too);
+ *   - red is reserved for errors and destructive actions. A "Demented" model
+ *     output is a finding to review, not an alarm, so it uses amber "attention",
+ *     and "Nondemented" uses teal.
+ *   - the two models have their own hues: classical SVM = brand blue,
+ *     quantum SVM = violet, so the toggle's state is legible at a glance.
+ */
+
+/* ------------------------------------------------------------------------- */
+/* 1. PRIMITIVES                                                              */
+/* ------------------------------------------------------------------------- */
+:root {
+  /* cool neutral */
+  --p-gray-0: #ffffff;
+  --p-gray-25: #fbfcfd;
+  --p-gray-50: #f5f7fa;
+  --p-gray-100: #eef1f5;
+  --p-gray-150: #e5e9ef;
+  --p-gray-200: #d9dfe7;
+  --p-gray-300: #c3cbd6;
+  --p-gray-400: #98a3b3;
+  --p-gray-500: #6b7787;
+  --p-gray-600: #525e6e;
+  --p-gray-700: #3e4856;
+  --p-gray-800: #2a323d;
+  --p-gray-850: #20262f;
+  --p-gray-900: #171c23;
+  --p-gray-950: #0e1217;
+
+  /* brand blue */
+  --p-blue-50: #eef4ff;
+  --p-blue-100: #dbe7fe;
+  --p-blue-200: #bdd3fd;
+  --p-blue-300: #8fb5fa;
+  --p-blue-400: #6d9cf6;
+  --p-blue-500: #3a6fe8;
+  --p-blue-600: #2756d1;
+  --p-blue-700: #1f44a8;
+  --p-blue-800: #1e3a86;
+  --p-blue-900: #1c326b;
+
+  /* teal — negative class / success */
+  --p-teal-50: #ecfbf7;
+  --p-teal-100: #d1f4ea;
+  --p-teal-200: #a5e8d6;
+  --p-teal-300: #6cd4bc;
+  --p-teal-400: #36b99d;
+  --p-teal-500: #179c82;
+  --p-teal-600: #0f7d69;
+  --p-teal-700: #106456;
+  --p-teal-800: #124f46;
+  --p-teal-900: #11413a;
+
+  /* amber — positive class / attention */
+  --p-amber-50: #fff8eb;
+  --p-amber-100: #feedc7;
+  --p-amber-200: #fcd98a;
+  --p-amber-300: #f9bf4d;
+  --p-amber-400: #f2a325;
+  --p-amber-500: #d9860f;
+  --p-amber-600: #b2660a;
+  --p-amber-700: #8d4d0c;
+  --p-amber-800: #733e11;
+  --p-amber-900: #5f3412;
+
+  /* red — errors only */
+  --p-red-50: #fff1f1;
+  --p-red-100: #ffdfdf;
+  --p-red-200: #ffc4c4;
+  --p-red-300: #fd9a9a;
+  --p-red-400: #f66b6b;
+  --p-red-500: #e63b3b;
+  --p-red-600: #c92a2a;
+  --p-red-700: #a62222;
+  --p-red-800: #891f1f;
+  --p-red-900: #721f1f;
+
+  /* violet — quantum SVM */
+  --p-violet-50: #f5f3ff;
+  --p-violet-100: #ece8ff;
+  --p-violet-200: #dcd4fe;
+  --p-violet-300: #c2b4fc;
+  --p-violet-400: #a990f9;
+  --p-violet-500: #8a63f1;
+  --p-violet-600: #7646e4;
+  --p-violet-700: #6236c8;
+  --p-violet-800: #512fa3;
+  --p-violet-900: #432a83;
+
+  /* 4px spacing grid */
+  --p-space-0: 0;
+  --p-space-px: 1px;
+  --p-space-0-5: 2px;
+  --p-space-1: 4px;
+  --p-space-1-5: 6px;
+  --p-space-2: 8px;
+  --p-space-3: 12px;
+  --p-space-4: 16px;
+  --p-space-5: 20px;
+  --p-space-6: 24px;
+  --p-space-7: 28px;
+  --p-space-8: 32px;
+  --p-space-10: 40px;
+  --p-space-12: 48px;
+  --p-space-16: 64px;
+
+  /* type scale (1.125 minor-second-ish, rem so it honours browser zoom) */
+  --p-font-12: 0.75rem;
+  --p-font-13: 0.8125rem;
+  --p-font-14: 0.875rem;
+  --p-font-15: 0.9375rem;
+  --p-font-16: 1rem;
+  --p-font-18: 1.125rem;
+  --p-font-20: 1.25rem;
+  --p-font-24: 1.5rem;
+  --p-font-30: 1.875rem;
+  --p-font-36: 2.25rem;
+
+  --p-weight-regular: 400;
+  --p-weight-medium: 500;
+  --p-weight-semibold: 600;
+  --p-weight-bold: 700;
+
+  --p-leading-tight: 1.2;
+  --p-leading-snug: 1.35;
+  --p-leading-normal: 1.55;
+
+  --p-radius-2: 2px;
+  --p-radius-4: 4px;
+  --p-radius-6: 6px;
+  --p-radius-8: 8px;
+  --p-radius-12: 12px;
+  --p-radius-16: 16px;
+  --p-radius-full: 999px;
+
+  --p-duration-100: 100ms;
+  --p-duration-150: 150ms;
+  --p-duration-200: 200ms;
+  --p-duration-300: 300ms;
+  --p-duration-450: 450ms;
+  --p-duration-700: 700ms;
+  --p-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --p-ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --p-ease-spring: cubic-bezier(0.34, 1.32, 0.64, 1);
+}
+
+/* ------------------------------------------------------------------------- */
+/* 2. SEMANTIC — light theme (default)                                        */
+/* ------------------------------------------------------------------------- */
+:root {
+  color-scheme: light;
+
+  /* surfaces */
+  --color-bg: var(--p-gray-50);
+  --color-surface: var(--p-gray-0);
+  --color-surface-raised: var(--p-gray-0);
+  --color-surface-sunken: var(--p-gray-100);
+  --color-surface-hover: var(--p-gray-25);
+  --color-surface-inverse: var(--p-gray-900);
+  --color-overlay: rgb(14 18 23 / 0.55);
+
+  /* lines */
+  --color-border: var(--p-gray-200);
+  --color-border-strong: var(--p-gray-300);
+  --color-divider: var(--p-gray-150);
+
+  /* text */
+  --color-text: var(--p-gray-900);
+  --color-text-muted: var(--p-gray-600);
+  --color-text-subtle: var(--p-gray-500);
+  --color-text-inverse: var(--p-gray-0);
+  --color-text-link: var(--p-blue-600);
+
+  /* brand / interactive */
+  --color-accent: var(--p-blue-600);
+  --color-accent-hover: var(--p-blue-700);
+  --color-accent-soft: var(--p-blue-50);
+  --color-accent-border: var(--p-blue-200);
+  --color-accent-text: var(--p-blue-700);
+  --color-on-accent: var(--p-gray-0);
+  --color-focus-ring: var(--p-blue-500);
+
+  /* status pairs (fg on bg, plus a border) */
+  --color-success-fg: var(--p-teal-700);
+  --color-success-bg: var(--p-teal-50);
+  --color-success-border: var(--p-teal-200);
+  --color-warning-fg: var(--p-amber-700);
+  --color-warning-bg: var(--p-amber-50);
+  --color-warning-border: var(--p-amber-200);
+  --color-danger-fg: var(--p-red-700);
+  --color-danger-bg: var(--p-red-50);
+  --color-danger-border: var(--p-red-200);
+  --color-danger-solid: var(--p-red-600);
+  --color-info-fg: var(--p-blue-700);
+  --color-info-bg: var(--p-blue-50);
+  --color-info-border: var(--p-blue-200);
+  --color-neutral-fg: var(--p-gray-600);
+  --color-neutral-bg: var(--p-gray-100);
+  --color-neutral-border: var(--p-gray-200);
+
+  /* domain: model classes and models */
+  --color-class-negative: var(--p-teal-600);
+  --color-class-negative-soft: var(--p-teal-50);
+  --color-class-positive: var(--p-amber-600);
+  --color-class-positive-soft: var(--p-amber-50);
+  --color-model-svm: var(--p-blue-600);
+  --color-model-svm-soft: var(--p-blue-50);
+  --color-model-qsvm: var(--p-violet-600);
+  --color-model-qsvm-soft: var(--p-violet-50);
+  --color-on-model: var(--p-gray-0);
+  --color-chart-mmse: var(--p-blue-600);
+  --color-chart-cdr: var(--p-amber-600);
+  --color-chart-grid: var(--p-gray-150);
+
+  /* elevation */
+  --shadow-xs: 0 1px 1px rgb(16 32 51 / 0.04);
+  --shadow-sm: 0 1px 2px rgb(16 32 51 / 0.06), 0 1px 3px rgb(16 32 51 / 0.04);
+  --shadow-md: 0 2px 4px rgb(16 32 51 / 0.04), 0 8px 24px rgb(16 32 51 / 0.07);
+  --shadow-lg: 0 12px 32px rgb(16 32 51 / 0.12), 0 2px 6px rgb(16 32 51 / 0.06);
+
+  /* spacing roles */
+  --space-2xs: var(--p-space-1);
+  --space-xs: var(--p-space-2);
+  --space-sm: var(--p-space-3);
+  --space-md: var(--p-space-4);
+  --space-lg: var(--p-space-6);
+  --space-xl: var(--p-space-8);
+  --space-2xl: var(--p-space-12);
+  --gutter: clamp(16px, 4vw, 32px);
+
+  /* typography roles */
+  --font-sans: "Inter", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --text-caption: var(--p-font-12);
+  --text-small: var(--p-font-13);
+  --text-body-sm: var(--p-font-14);
+  --text-body: var(--p-font-15);
+  --text-lead: var(--p-font-16);
+  --text-h3: var(--p-font-16);
+  --text-h2: var(--p-font-18);
+  --text-h1: clamp(var(--p-font-24), 2.4vw + 0.9rem, var(--p-font-30));
+  --text-display: clamp(var(--p-font-30), 3vw + 1rem, var(--p-font-36));
+  --weight-regular: var(--p-weight-regular);
+  --weight-medium: var(--p-weight-medium);
+  --weight-semibold: var(--p-weight-semibold);
+  --weight-bold: var(--p-weight-bold);
+  --leading-tight: var(--p-leading-tight);
+  --leading-snug: var(--p-leading-snug);
+  --leading-body: var(--p-leading-normal);
+
+  /* shape */
+  --radius-sm: var(--p-radius-6);
+  --radius-md: var(--p-radius-8);
+  --radius-lg: var(--p-radius-12);
+  --radius-xl: var(--p-radius-16);
+  --radius-pill: var(--p-radius-full);
+
+  /* motion */
+  --motion-fast: var(--p-duration-150);
+  --motion-base: var(--p-duration-200);
+  --motion-slow: var(--p-duration-450);
+  --motion-emphasis: var(--p-duration-700);
+  --ease-standard: var(--p-ease-standard);
+  --ease-out: var(--p-ease-out);
+  --ease-spring: var(--p-ease-spring);
+
+  /* layout */
+  --page-max: 1080px;
+  --page-narrow: 760px;
+  --nav-height: 60px;
+  --z-nav: 50;
+  --z-overlay: 100;
+
+  /* ----------------------------------------------------------------------- */
+  /* 3. COMPONENT                                                             */
+  /* ----------------------------------------------------------------------- */
+  --button-height: 40px;
+  --button-height-sm: 32px;
+  --button-padding-x: var(--p-space-4);
+  --button-radius: var(--radius-md);
+  --field-height: 42px;
+  --field-radius: var(--radius-md);
+  --field-bg: var(--color-surface);
+  --field-border: var(--color-border-strong);
+  --field-bg-readonly: var(--color-surface-sunken);
+  --card-padding: clamp(var(--p-space-4), 2.6vw, var(--p-space-7));
+  --card-radius: var(--radius-lg);
+  --card-shadow: var(--shadow-sm);
+  --chart-track-height: 16px;
+  --chart-marker-size: 18px;
+
+  /* Legacy aliases (pre-design-system names some screens still read). */
+  --bg: var(--color-bg);
+  --surface: var(--color-surface);
+  --border: var(--color-border);
+  --border-strong: var(--color-border-strong);
+  --text: var(--color-text);
+  --text-muted: var(--color-text-muted);
+  --accent: var(--color-accent);
+  --accent-hover: var(--color-accent-hover);
+  --accent-soft: var(--color-accent-soft);
+  --danger: var(--color-danger-fg);
+  --danger-soft: var(--color-danger-bg);
+  --radius: var(--radius-lg);
+  --shadow-card: var(--card-shadow);
+  --sans: var(--font-sans);
+  --mono: var(--font-mono);
+}
+
+/* ------------------------------------------------------------------------- */
+/* 2b. SEMANTIC — dark theme. Follows the OS unless the user picked a theme   */
+/*     (html[data-theme="light"|"dark"], set by the nav's theme toggle).      */
+/*     Plain CSS has no mixins, so the two blocks below carry the same values. */
+/* ------------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-bg: var(--p-gray-950);
+    --color-surface: var(--p-gray-900);
+    --color-surface-raised: var(--p-gray-850);
+    --color-surface-sunken: #0a0d11;
+    --color-surface-hover: var(--p-gray-850);
+    --color-surface-inverse: var(--p-gray-50);
+    --color-overlay: rgb(0 0 0 / 0.65);
+    --color-border: var(--p-gray-800);
+    --color-border-strong: var(--p-gray-700);
+    --color-divider: var(--p-gray-850);
+    --color-text: var(--p-gray-50);
+    --color-text-muted: var(--p-gray-400);
+    --color-text-subtle: var(--p-gray-500);
+    --color-text-inverse: var(--p-gray-950);
+    --color-text-link: var(--p-blue-300);
+    --color-accent: var(--p-blue-500);
+    --color-accent-hover: var(--p-blue-400);
+    --color-accent-soft: rgb(58 111 232 / 0.16);
+    --color-accent-border: rgb(109 156 246 / 0.4);
+    --color-accent-text: var(--p-blue-300);
+    --color-on-accent: var(--p-gray-0);
+    --color-focus-ring: var(--p-blue-400);
+    --color-success-fg: var(--p-teal-300);
+    --color-success-bg: rgb(23 156 130 / 0.14);
+    --color-success-border: rgb(54 185 157 / 0.35);
+    --color-warning-fg: var(--p-amber-300);
+    --color-warning-bg: rgb(217 134 15 / 0.14);
+    --color-warning-border: rgb(242 163 37 / 0.35);
+    --color-danger-fg: var(--p-red-300);
+    --color-danger-bg: rgb(230 59 59 / 0.14);
+    --color-danger-border: rgb(246 107 107 / 0.35);
+    --color-danger-solid: var(--p-red-600);
+    --color-info-fg: var(--p-blue-300);
+    --color-info-bg: rgb(58 111 232 / 0.14);
+    --color-info-border: rgb(109 156 246 / 0.35);
+    --color-neutral-fg: var(--p-gray-300);
+    --color-neutral-bg: var(--p-gray-850);
+    --color-neutral-border: var(--p-gray-800);
+    --color-class-negative: var(--p-teal-400);
+    --color-class-negative-soft: rgb(23 156 130 / 0.16);
+    --color-class-positive: var(--p-amber-400);
+    --color-class-positive-soft: rgb(217 134 15 / 0.16);
+    --color-model-svm: var(--p-blue-400);
+    --color-model-svm-soft: rgb(58 111 232 / 0.16);
+    --color-model-qsvm: var(--p-violet-400);
+    --color-model-qsvm-soft: rgb(138 99 241 / 0.18);
+    --color-on-model: var(--p-gray-950);
+    --color-chart-mmse: var(--p-blue-400);
+    --color-chart-cdr: var(--p-amber-400);
+    --color-chart-grid: var(--p-gray-800);
+    --shadow-xs: none;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 8px 24px rgb(0 0 0 / 0.45);
+    --shadow-lg: 0 16px 40px rgb(0 0 0 / 0.55);
+  }
+}
+
+/* Explicit dark choice — identical values to the OS-dark block above. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: var(--p-gray-950);
+  --color-surface: var(--p-gray-900);
+  --color-surface-raised: var(--p-gray-850);
+  --color-surface-sunken: #0a0d11;
+  --color-surface-hover: var(--p-gray-850);
+  --color-surface-inverse: var(--p-gray-50);
+  --color-overlay: rgb(0 0 0 / 0.65);
+  --color-border: var(--p-gray-800);
+  --color-border-strong: var(--p-gray-700);
+  --color-divider: var(--p-gray-850);
+  --color-text: var(--p-gray-50);
+  --color-text-muted: var(--p-gray-400);
+  --color-text-subtle: var(--p-gray-500);
+  --color-text-inverse: var(--p-gray-950);
+  --color-text-link: var(--p-blue-300);
+  --color-accent: var(--p-blue-500);
+  --color-accent-hover: var(--p-blue-400);
+  --color-accent-soft: rgb(58 111 232 / 0.16);
+  --color-accent-border: rgb(109 156 246 / 0.4);
+  --color-accent-text: var(--p-blue-300);
+  --color-on-accent: var(--p-gray-0);
+  --color-focus-ring: var(--p-blue-400);
+  --color-success-fg: var(--p-teal-300);
+  --color-success-bg: rgb(23 156 130 / 0.14);
+  --color-success-border: rgb(54 185 157 / 0.35);
+  --color-warning-fg: var(--p-amber-300);
+  --color-warning-bg: rgb(217 134 15 / 0.14);
+  --color-warning-border: rgb(242 163 37 / 0.35);
+  --color-danger-fg: var(--p-red-300);
+  --color-danger-bg: rgb(230 59 59 / 0.14);
+  --color-danger-border: rgb(246 107 107 / 0.35);
+  --color-danger-solid: var(--p-red-600);
+  --color-info-fg: var(--p-blue-300);
+  --color-info-bg: rgb(58 111 232 / 0.14);
+  --color-info-border: rgb(109 156 246 / 0.35);
+  --color-neutral-fg: var(--p-gray-300);
+  --color-neutral-bg: var(--p-gray-850);
+  --color-neutral-border: var(--p-gray-800);
+  --color-class-negative: var(--p-teal-400);
+  --color-class-negative-soft: rgb(23 156 130 / 0.16);
+  --color-class-positive: var(--p-amber-400);
+  --color-class-positive-soft: rgb(217 134 15 / 0.16);
+  --color-model-svm: var(--p-blue-400);
+  --color-model-svm-soft: rgb(58 111 232 / 0.16);
+  --color-model-qsvm: var(--p-violet-400);
+  --color-model-qsvm-soft: rgb(138 99 241 / 0.18);
+  --color-on-model: var(--p-gray-950);
+  --color-chart-mmse: var(--p-blue-400);
+  --color-chart-cdr: var(--p-amber-400);
+  --color-chart-grid: var(--p-gray-800);
+  --shadow-xs: none;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 8px 24px rgb(0 0 0 / 0.45);
+  --shadow-lg: 0 16px 40px rgb(0 0 0 / 0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-slow: 0ms;
+    --motion-emphasis: 0ms;
+  }
+}

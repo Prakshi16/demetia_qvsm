@@ -1,0 +1,327 @@
+/**
+ * Layout layer: the signed-in shell, page containers, the auth screens, and
+ * print. Breakpoints: 640px (phone -> tablet) and 960px (tablet -> desktop).
+ */
+
+/* ===== Auth screens ===================================================== */
+.auth-screen {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: var(--space-xl) var(--gutter);
+  background:
+    radial-gradient(60rem 30rem at 10% -10%, var(--color-accent-soft), transparent 60%),
+    radial-gradient(40rem 24rem at 110% 110%, var(--color-model-qsvm-soft), transparent 60%),
+    var(--color-bg);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  padding: clamp(var(--space-lg), 5vw, 40px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+}
+
+.auth-card-wide {
+  max-width: 600px;
+}
+
+.auth-header {
+  margin-bottom: var(--space-lg);
+}
+
+.auth-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-accent-text);
+}
+
+.auth-brand::before {
+  content: "";
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--color-model-svm), var(--color-model-qsvm));
+}
+
+.auth-subtitle {
+  margin-top: var(--space-xs);
+  color: var(--color-text-muted);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.auth-switch {
+  margin-top: var(--space-lg);
+  font-size: var(--text-body-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+/* ===== Signed-in shell ================================================== */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-nav {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-nav);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  min-height: var(--nav-height);
+  padding: var(--space-xs) var(--gutter);
+  background: color-mix(in srgb, var(--color-surface) 86%, transparent);
+  border-bottom: 1px solid var(--color-border);
+  backdrop-filter: saturate(1.4) blur(10px);
+  -webkit-backdrop-filter: saturate(1.4) blur(10px);
+}
+
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.nav-home {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-text);
+  text-decoration: none;
+  flex: none;
+}
+
+.nav-home-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  font-size: 1.05rem;
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-model-svm), var(--color-model-qsvm));
+  border-radius: 9px;
+  box-shadow: var(--shadow-sm);
+}
+
+.nav-brand {
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.01em;
+}
+
+.nav-hospital {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+  padding: 3px 12px 3px 3px;
+  color: var(--color-text);
+  text-decoration: none;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  transition: border-color var(--motion-fast);
+}
+
+.nav-hospital:hover {
+  border-color: var(--color-border-strong);
+}
+
+.nav-hospital-logo {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.nav-hospital-logo--fallback {
+  display: grid;
+  place-items: center;
+  font-size: 0.68rem;
+  font-weight: var(--weight-bold);
+  color: var(--color-accent-text);
+  background: var(--color-accent-soft);
+}
+
+.nav-hospital-name {
+  overflow: hidden;
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.nav-hospital-city {
+  font-weight: var(--weight-regular);
+  color: var(--color-text-muted);
+}
+
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-body-sm);
+}
+
+.nav-user-name {
+  font-weight: var(--weight-semibold);
+}
+
+.nav-menu-button {
+  display: none;
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  padding: clamp(var(--space-lg), 4vw, 40px) var(--gutter) var(--space-2xl);
+}
+
+.app-footer {
+  padding: var(--space-md) var(--gutter);
+  font-size: var(--text-caption);
+  color: var(--color-text-muted);
+  text-align: center;
+  border-top: 1px solid var(--color-border);
+}
+
+.app-footer a {
+  color: inherit;
+}
+
+.page {
+  width: 100%;
+  max-width: var(--page-max);
+  margin: 0 auto;
+}
+
+.page--narrow {
+  max-width: var(--page-narrow);
+}
+
+.visit-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* Two-column page body on wide screens (main + aside). */
+.page-columns {
+  display: grid;
+  gap: var(--space-lg);
+  align-items: start;
+}
+
+@media (min-width: 960px) {
+  .page-columns {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+/* ===== Responsive nav ================================================== */
+@media (max-width: 860px) {
+  .nav-hospital-city {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .nav-brand {
+    display: none;
+  }
+
+  .nav-menu-button {
+    display: inline-grid;
+  }
+
+  .nav-user {
+    position: absolute;
+    top: calc(100% + 1px);
+    right: var(--gutter);
+    left: var(--gutter);
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .nav-user.is-open {
+    display: flex;
+    animation: menu-in var(--motion-base) var(--ease-out);
+  }
+
+  .nav-user .button-quiet {
+    width: 100%;
+  }
+
+  .nav-user-role {
+    align-self: flex-start;
+  }
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* ===== Print (Export as PDF) =========================================== */
+@media print {
+  /* Paper is always light, whatever theme is on screen. (The :not(#id)
+     raises specificity above both dark-theme selectors.) */
+  html:not(#print-light) {
+    color-scheme: light;
+    --color-bg: #fff;
+    --color-surface: #fff;
+    --color-surface-sunken: #f5f7fa;
+    --color-border: #d9dfe7;
+    --color-text: #171c23;
+    --color-text-muted: #525e6e;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .app-nav,
+  .app-footer,
+  .back-link,
+  .no-print {
+    display: none !important;
+  }
+
+  .app-main {
+    padding: 0;
+  }
+
+  .visit-card,
+  .card {
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+}

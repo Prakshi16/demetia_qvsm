@@ -235,7 +235,22 @@ export const api = {
   // The speech recording as an MP3 Blob for the <audio> player — transcoded
   // server-side so it plays in every browser (WebM/Opus doesn't).
   getVisitAudioBlob: (visitId) => fetchBlob(`/visits/${visitId}/audio`),
+
+  // Cross-validated metrics + decision scale per model (classical SVM, QSVM),
+  // behind the prediction panel's model toggle. Static per deploy, so it's
+  // fetched once and shared by every panel on the page.
+  getModelInfo: () => {
+    if (!modelInfoPromise) {
+      modelInfoPromise = request("/models/info").catch((error) => {
+        modelInfoPromise = null; // let a later panel retry
+        throw error;
+      });
+    }
+    return modelInfoPromise;
+  },
 };
+
+let modelInfoPromise = null;
 
 /**
  * Hospital logo upload. Multipart FormData can't go through `request()` (same
