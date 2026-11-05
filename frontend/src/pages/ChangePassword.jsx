@@ -69,7 +69,7 @@ export default function ChangePassword() {
         </p>
       </header>
 
-      <form className="visit-form" onSubmit={handleSubmit} style={{ maxWidth: "26rem" }}>
+      <form className="visit-form" onSubmit={handleSubmit} style={{ maxWidth: "var(--width-form)" }}>
         <label className="field">
           <span className="field-label">
             {forced ? "Temporary password" : "Current password"}

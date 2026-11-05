@@ -12,6 +12,16 @@
 import { useEffect, useRef, useState } from "react";
 import { Niivue } from "@niivue/niivue";
 
+// Niivue paints in WebGL and takes an RGBA float array, not CSS, so read the
+// --color-scan-bg token off the element instead of repeating the colour here.
+function tokenRgba(element, token) {
+  const value = getComputedStyle(element).getPropertyValue(token).trim();
+  const match = /^#([0-9a-f]{6})$/i.exec(value);
+  if (!match) return [0, 0, 0, 1];
+  const n = parseInt(match[1], 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255, 1];
+}
+
 export default function ScanViewer({ url, filename }) {
   const canvasRef = useRef(null);
   const nvRef = useRef(null);
@@ -24,7 +34,7 @@ export default function ScanViewer({ url, filename }) {
 
     setStatus("loading");
     const nv = new Niivue({
-      backColor: [0.06, 0.08, 0.11, 1],
+      backColor: tokenRgba(canvas, "--color-scan-bg"),
       show3Dcrosshair: true,
       dragAndDropEnabled: false,
     });

@@ -14,8 +14,13 @@ import SegmentedControl from "../components/ui/SegmentedControl";
 import { useTheme } from "../theme/useTheme";
 import { validateWholeNumber } from "../utils/validate";
 
-const RAMPS = ["gray", "blue", "teal", "amber", "red", "violet"];
-const STEPS = { gray: [50, 100, 200, 300, 400, 500, 600, 700, 800, 900], default: [50, 100, 200, 300, 400, 500, 600, 700, 800, 900] };
+const RAMPS = ["deep", "sage", "tide", "ochre", "red"];
+const STEPS = {
+  deep: [25, 50, 100, 150, 200, 300, 500, 600, 650, 700, 750, 800, 850, 900, 950],
+  tide: [50, 300, 400, 500, 600],
+  ochre: [50, 100, 200, 600, 700],
+  default: [50, 100, 200, 300, 400, 500, 600, 700, 800, 900],
+};
 
 const SEMANTIC = [
   ["--color-bg", "Page background"],
@@ -137,8 +142,8 @@ export default function DesignSystem() {
         title="Principles"
         intro="The rules every decision below follows."
       >
-        <ul style={{ margin: 0, paddingLeft: "1.2rem", display: "grid", gap: "var(--space-xs)" }}>
-          <li><strong>Clinical calm.</strong> Red only means an error. A “Demented” model output is a finding to review, so it is amber, not red.</li>
+        <ul style={{ margin: 0, paddingLeft: "var(--list-indent)", display: "grid", gap: "var(--space-xs)" }}>
+          <li><strong>Clinical calm.</strong> The interface stays in one muted teal-sage family; saturated colour is kept for clinical signal. Red only means an error. A “Demented” model output is a finding to review, so it is amber, not red.</li>
           <li><strong>Never colour alone.</strong> Every status carries a word (and badges a dot); every chart has labels.</li>
           <li><strong>Honest numbers.</strong> A model margin is shown on a diverging axis around its decision boundary, never as a percentage.</li>
           <li><strong>AA contrast.</strong> Body and muted text are ≥4.5:1 on every surface in both themes (checked by <code>npm run check:contrast</code>).</li>
@@ -151,7 +156,7 @@ export default function DesignSystem() {
           {RAMPS.map((ramp) => (
             <div key={ramp}>
               <p className="ds-ramp-label">{ramp}</p>
-              <div className="ds-ramp">
+              <div className="ds-ramp" style={{ "--steps": (STEPS[ramp] ?? STEPS.default).length }}>
                 {(STEPS[ramp] ?? STEPS.default).map((step) => (
                   <span key={step} style={{ "--c": `var(--p-${ramp}-${step})` }} title={`--p-${ramp}-${step}`} />
                 ))}
@@ -176,13 +181,13 @@ export default function DesignSystem() {
           {TYPE.map(([token, label, weight]) => (
             <div key={token} className="ds-type-row">
               <code>{token}</code>
-              <span style={{ fontSize: `var(${token})`, fontWeight: weight, lineHeight: 1.25 }}>{label}</span>
+              <span style={{ fontSize: `var(${token})`, fontWeight: weight, lineHeight: "var(--leading-tight)" }}>{label}</span>
             </div>
           ))}
         </div>
       </Section>
 
-      <Section id="ds-space" title="Spacing, shape and elevation" intro="A 4px grid. Radii: 6 / 8 / 12 / 16 / pill. Shadows soften to borders in dark mode.">
+      <Section id="ds-space" title="Spacing, shape and elevation" intro="A 4px grid. Radii: 2 / 4 / 6 / 8 / 12 / 16 / pill. Shadows soften to borders in dark mode.">
         <div className="ds-space">
           {SPACE.map((token) => (
             <div key={token} className="ds-space-row">
@@ -196,9 +201,9 @@ export default function DesignSystem() {
             <div
               key={shadow}
               style={{
-                width: 120, height: 64, display: "grid", placeItems: "center",
+                width: "var(--ds-demo-width)", height: "var(--ds-demo-height)", display: "grid", placeItems: "center",
                 background: "var(--color-surface)", borderRadius: "var(--radius-lg)",
-                border: "1px solid var(--color-border)", boxShadow: `var(${shadow})`,
+                border: "var(--border-width) solid var(--color-border)", boxShadow: `var(${shadow})`,
                 fontSize: "var(--text-caption)",
               }}
             >
@@ -267,7 +272,7 @@ export default function DesignSystem() {
             ]}
           />
           <span className="spinner" aria-label="Loading" />
-          <span className="skeleton" style={{ width: 160 }} />
+          <span className="skeleton" style={{ width: "var(--ds-demo-width)" }} />
         </div>
       </Section>
 

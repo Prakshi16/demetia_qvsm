@@ -7,30 +7,30 @@
 .auth-screen {
   display: grid;
   place-items: center;
-  min-height: 100vh;
+  min-height: var(--size-viewport);
   padding: var(--space-xl) var(--gutter);
   /* One restrained, single-hue wash fading out near the top — not the
      two-colour corner blobs that read as a stock "AI" mesh gradient. */
   background:
     radial-gradient(
-      75rem 38rem at 50% -24%,
-      color-mix(in srgb, var(--color-accent) 7%, var(--color-bg)),
-      var(--color-bg) 68%
+      var(--auth-wash-shape),
+      var(--color-auth-wash),
+      var(--color-bg) var(--auth-wash-fade)
     );
 }
 
 .auth-card {
   width: 100%;
-  max-width: 440px;
-  padding: clamp(var(--space-lg), 5vw, 40px);
+  max-width: var(--width-auth);
+  padding: var(--card-padding-auth);
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
 }
 
 .auth-card-wide {
-  max-width: 600px;
+  max-width: var(--width-auth-wide);
 }
 
 .auth-header {
@@ -44,17 +44,17 @@
   margin: 0 0 var(--space-md);
   font-size: var(--text-caption);
   font-weight: var(--weight-bold);
-  letter-spacing: 0.1em;
+  letter-spacing: var(--tracking-brand);
   text-transform: uppercase;
   color: var(--color-accent-text);
 }
 
 .auth-brand::before {
   content: "";
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
-  background: linear-gradient(135deg, var(--color-model-svm), var(--color-model-qsvm));
+  width: var(--size-icon-md);
+  height: var(--size-icon-md);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
 }
 
 .auth-subtitle {
@@ -77,7 +77,7 @@
 
 /* ===== Signed-in shell ================================================== */
 .app-shell {
-  min-height: 100vh;
+  min-height: var(--size-viewport);
   display: flex;
   flex-direction: column;
 }
@@ -92,10 +92,10 @@
   gap: var(--space-md);
   min-height: var(--nav-height);
   padding: var(--space-xs) var(--gutter);
-  background: color-mix(in srgb, var(--color-surface) 86%, transparent);
-  border-bottom: 1px solid var(--color-border);
-  backdrop-filter: saturate(1.4) blur(10px);
-  -webkit-backdrop-filter: saturate(1.4) blur(10px);
+  background: var(--color-nav-bg);
+  border-bottom: var(--border-width) solid var(--color-border);
+  backdrop-filter: var(--nav-backdrop);
+  -webkit-backdrop-filter: var(--nav-backdrop);
 }
 
 .nav-left {
@@ -108,7 +108,7 @@
 .nav-home {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-xs);
   color: var(--color-text);
   text-decoration: none;
   flex: none;
@@ -117,18 +117,18 @@
 .nav-home-icon {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  font-size: 1.05rem;
-  color: #fff;
-  background: linear-gradient(135deg, var(--color-model-svm), var(--color-model-qsvm));
-  border-radius: 9px;
+  width: var(--size-icon-lg);
+  height: var(--size-icon-lg);
+  font-size: var(--text-lead);
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
 }
 
 .nav-brand {
   font-weight: var(--weight-bold);
-  letter-spacing: -0.01em;
+  letter-spacing: var(--tracking-heading);
 }
 
 .nav-hospital {
@@ -136,11 +136,11 @@
   align-items: center;
   gap: var(--space-xs);
   min-width: 0;
-  padding: 3px 12px 3px 3px;
+  padding: var(--space-3xs) var(--space-sm) var(--space-3xs) var(--space-3xs);
   color: var(--color-text);
   text-decoration: none;
   background: var(--color-surface-sunken);
-  border: 1px solid var(--color-border);
+  border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-pill);
   transition: border-color var(--motion-fast);
 }
@@ -151,16 +151,16 @@
 
 .nav-hospital-logo {
   flex: none;
-  width: 26px;
-  height: 26px;
+  width: var(--size-avatar);
+  height: var(--size-avatar);
   object-fit: cover;
-  border-radius: 50%;
+  border-radius: var(--radius-round);
 }
 
 .nav-hospital-logo--fallback {
   display: grid;
   place-items: center;
-  font-size: 0.68rem;
+  font-size: var(--text-micro);
   font-weight: var(--weight-bold);
   color: var(--color-accent-text);
   background: var(--color-accent-soft);
@@ -197,7 +197,7 @@
 .app-main {
   flex: 1;
   width: 100%;
-  padding: clamp(var(--space-lg), 4vw, 40px) var(--gutter) var(--space-2xl);
+  padding: var(--page-padding-top) var(--gutter) var(--space-2xl);
 }
 
 .app-footer {
@@ -205,7 +205,7 @@
   font-size: var(--text-caption);
   color: var(--color-text-muted);
   text-align: center;
-  border-top: 1px solid var(--color-border);
+  border-top: var(--border-width) solid var(--color-border);
 }
 
 .app-footer a {
@@ -259,7 +259,7 @@
 
   .nav-user {
     position: absolute;
-    top: calc(100% + 1px);
+    top: calc(100% + var(--border-width));
     right: var(--gutter);
     left: var(--gutter);
     display: none;
@@ -268,7 +268,7 @@
     gap: var(--space-sm);
     padding: var(--space-md);
     background: var(--color-surface);
-    border: 1px solid var(--color-border);
+    border: var(--border-width) solid var(--color-border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
   }
@@ -290,26 +290,15 @@
 @keyframes menu-in {
   from {
     opacity: 0;
-    transform: translateY(-4px);
+    transform: translateY(calc(-1 * var(--motion-drop-offset)));
   }
 }
 
 /* ===== Print (Export as PDF) =========================================== */
 @media print {
-  /* Paper is always light, whatever theme is on screen. (The :not(#id)
-     raises specificity above both dark-theme selectors.) */
-  html:not(#print-light) {
-    color-scheme: light;
-    --color-bg: #fff;
-    --color-surface: #fff;
-    --color-surface-sunken: #f5f7fa;
-    --color-border: #d9dfe7;
-    --color-text: #171c23;
-    --color-text-muted: #525e6e;
-  }
-
+  /* The print colour theme lives in tokens.css (2c). */
   body {
-    background: #fff;
+    background: var(--color-surface);
   }
 
   .app-nav,

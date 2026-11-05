@@ -5,8 +5,10 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Cortex Health Portal: multimodal dementia screening decision support (research tool)." />
-    <meta name="theme-color" content="#f5f7fa" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0e1217" media="(prefers-color-scheme: dark)" />
+    <!-- First-paint fallback only (= --color-bg in tokens.css, light / dark);
+         useTheme() overwrites these from the token once the app loads. -->
+    <meta name="theme-color" content="#f8f6f4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#040d12" media="(prefers-color-scheme: dark)" />
     <title>Cortex Health Portal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

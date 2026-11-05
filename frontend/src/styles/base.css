@@ -15,7 +15,7 @@ html {
 
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: var(--size-viewport);
   font-family: var(--font-sans);
   font-size: var(--text-body);
   line-height: var(--leading-body);
@@ -35,14 +35,14 @@ h4 {
   margin: 0;
   color: var(--color-text);
   line-height: var(--leading-tight);
-  letter-spacing: -0.012em;
+  letter-spacing: var(--tracking-heading);
   text-wrap: balance;
 }
 
 h1 {
   font-size: var(--text-h1);
   font-weight: var(--weight-bold);
-  letter-spacing: -0.02em;
+  letter-spacing: var(--tracking-title);
 }
 
 h2 {
@@ -62,7 +62,7 @@ p {
 
 a {
   color: var(--color-text-link);
-  text-underline-offset: 0.18em;
+  text-underline-offset: var(--link-underline-offset);
 }
 
 img,
@@ -79,7 +79,7 @@ dd {
 code,
 .mono {
   font-family: var(--font-mono);
-  font-size: 0.9em;
+  font-size: var(--text-code);
 }
 
 .tabular {
@@ -91,11 +91,11 @@ code,
   color: var(--color-text);
 }
 
-/* One focus style everywhere: a 2px ring that's visible on every surface,
+/* One focus style everywhere: a ring that's visible on every surface,
    shown for keyboard focus only. */
 :focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 :focus:not(:focus-visible) {

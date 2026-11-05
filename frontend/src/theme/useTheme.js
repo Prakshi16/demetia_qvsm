@@ -65,5 +65,16 @@ export function useTheme() {
   }, []);
 
   const resolved = preference === "system" ? (systemDark ? "dark" : "light") : preference;
+
+  // The browser bar colour (<meta name="theme-color">) can't read CSS, so copy
+  // the --color-bg token into it whenever the resolved theme changes.
+  useEffect(() => {
+    const bg = getComputedStyle(document.documentElement).getPropertyValue("--color-bg").trim();
+    if (!bg) return;
+    document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+      meta.setAttribute("content", bg);
+    });
+  }, [resolved]);
+
   return { preference, resolved, setTheme };
 }

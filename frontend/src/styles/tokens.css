@@ -2,14 +2,26 @@
  * Cortex design tokens — three tiers, references flow one way only:
  *
  *   1. PRIMITIVES  (--p-*)   raw values: colour ramps, the 4px spacing grid, the
- *                            type scale, radii, shadows, motion. Never used by a
- *                            component directly.
- *   2. SEMANTIC    (--color-*, --space-*, --text-*, ...)
+ *                            type scale, radii, borders, shadows, motion. Never
+ *                            used by a component directly.
+ *   2. SEMANTIC    (--color-*, --space-*, --text-*, --radius-*, ...)
  *                            what a value is FOR ("muted text", "warning
  *                            surface"). This is the tier every stylesheet reads,
- *                            and the only tier the dark theme redefines.
- *   3. COMPONENT   (--button-*, --field-*, --card-*, --chart-*)
- *                            only where a component needs a knob of its own.
+ *                            and the only tier the dark and print themes redefine.
+ *   3. COMPONENT   (--button-*, --field-*, --chart-*, ...)
+ *                            a knob owned by one component.
+ *
+ * THE RULE: this is the only file in the app that contains a literal colour,
+ * length, duration, weight, line-height or letter-spacing. Every other
+ * stylesheet and every inline style reads a token. Re-theming = editing this
+ * file. (Exceptions, all non-design: media-query breakpoints — CSS can't read
+ * var() there — and the standard visually-hidden / reduced-motion snippets.)
+ *
+ * Palette — Prakshi's four (Color Hunt): #040D12 #183D3D #5C8374 #93B1A6,
+ * as the "deep" ramp; light mode uses its pale sage steps with white cards,
+ * dark mode its darkest steps. Clinical colours sit outside it on purpose:
+ * mint/sage = Nondemented, gold/ochre = Demented, red = errors only,
+ * tide teal = quantum SVM.
  *
  * Colour rules (WCAG 2.2 AA, checked by scripts/check-contrast.mjs):
  *   - body and muted text >= 4.5:1 on every surface they sit on;
@@ -17,67 +29,71 @@
  *     by colour alone (always a word or icon too);
  *   - red is reserved for errors and destructive actions. A "Demented" model
  *     output is a finding to review, not an alarm, so it uses amber "attention",
- *     and "Nondemented" uses teal.
- *   - the two models have their own hues: classical SVM = brand blue,
- *     quantum SVM = violet, so the toggle's state is legible at a glance.
+ *     and "Nondemented" uses green.
+ *   - the two models: classical SVM = the brand teal, quantum SVM = tide teal.
+ *     Always paired with the model's name.
  */
 
 /* ------------------------------------------------------------------------- */
 /* 1. PRIMITIVES                                                              */
 /* ------------------------------------------------------------------------- */
 :root {
-  /* cool neutral */
-  --p-gray-0: #ffffff;
-  --p-gray-25: #fbfcfd;
-  --p-gray-50: #f5f7fa;
-  --p-gray-100: #eef1f5;
-  --p-gray-150: #e5e9ef;
-  --p-gray-200: #d9dfe7;
-  --p-gray-300: #c3cbd6;
-  --p-gray-400: #98a3b3;
-  --p-gray-500: #6b7787;
-  --p-gray-600: #525e6e;
-  --p-gray-700: #3e4856;
-  --p-gray-800: #2a323d;
-  --p-gray-850: #20262f;
-  --p-gray-900: #171c23;
-  --p-gray-950: #0e1217;
+  /* white */
+  --p-ink-0: #ffffff;
 
-  /* brand blue */
-  --p-blue-50: #eef4ff;
-  --p-blue-100: #dbe7fe;
-  --p-blue-200: #bdd3fd;
-  --p-blue-300: #8fb5fa;
-  --p-blue-400: #6d9cf6;
-  --p-blue-500: #3a6fe8;
-  --p-blue-600: #2756d1;
-  --p-blue-700: #1f44a8;
-  --p-blue-800: #1e3a86;
-  --p-blue-900: #1c326b;
+  /* paper — the warm off-white light-theme page */
+  --p-paper-50: #f8f6f4; /* Mist */
 
-  /* teal — negative class / success */
-  --p-teal-50: #ecfbf7;
-  --p-teal-100: #d1f4ea;
-  --p-teal-200: #a5e8d6;
-  --p-teal-300: #6cd4bc;
-  --p-teal-400: #36b99d;
-  --p-teal-500: #179c82;
-  --p-teal-600: #0f7d69;
-  --p-teal-700: #106456;
-  --p-teal-800: #124f46;
-  --p-teal-900: #11413a;
+  /* sage — negative class / success */
+  --p-sage-50: #eaf4ee;
+  --p-sage-100: #d5eadd;
+  --p-sage-200: #b9d9c5;
+  --p-sage-300: #8cc2a2;
+  --p-sage-400: #5fa57d;
+  --p-sage-500: #4a8c67;
+  --p-sage-600: #3f7d5a;
+  --p-sage-700: #2f6446;
+  --p-sage-800: #244e37;
+  --p-sage-900: #1b3b2a;
 
-  /* amber — positive class / attention */
-  --p-amber-50: #fff8eb;
-  --p-amber-100: #feedc7;
-  --p-amber-200: #fcd98a;
-  --p-amber-300: #f9bf4d;
-  --p-amber-400: #f2a325;
-  --p-amber-500: #d9860f;
-  --p-amber-600: #b2660a;
-  --p-amber-700: #8d4d0c;
-  --p-amber-800: #733e11;
-  --p-amber-900: #5f3412;
+  /* deep — the dark theme, built on Prakshi's palette
+     #040D12 #183D3D #5C8374 #93B1A6 (marked "given"); the rest are steps
+     interpolated in the same hues. */
+  --p-deep-950: #02080b;
+  --p-deep-900: #040d12; /* given */
+  --p-deep-850: #0a1a1e;
+  --p-deep-800: #0d2325;
+  --p-deep-750: #122c2e;
+  --p-deep-700: #183d3d; /* given */
+  --p-deep-650: #10302f;
+  --p-deep-500: #5c8374; /* given */
+  --p-deep-300: #93b1a6; /* given */
+  --p-deep-200: #b9d3c9;
+  --p-deep-600: #4a6e61; /* #5C8374 darkened to pass 4.5:1 on white */
+  --p-deep-150: #cedfd8;
+  --p-deep-100: #e3ece8;
+  --p-deep-50: #eef4f1;
+  --p-deep-25: #f6f9f8;
+
+  /* mint — Nondemented on dark: clearer than the sage brand so a result
+     never reads as a control */
+  --p-mint-300: #7fcb9f;
+
+  /* tide — ocean teal, the quantum SVM's own hue */
+  --p-tide-50: #e6f1f4;
+  --p-tide-300: #7fbccc;
+  --p-tide-400: #4c9bb0;
+  --p-tide-500: #337f93;
+  --p-tide-600: #276a7c;
+
+  /* gold — softened attention for dark backgrounds (amber is too loud there) */
+  --p-gold-300: #ddb070;
+  /* ochre — the same gold, deepened to read on light surfaces */
+  --p-ochre-50: #faf4e9;
+  --p-ochre-100: #f3e6cc;
+  --p-ochre-200: #e6cf9f;
+  --p-ochre-600: #9a6b1f;
+  --p-ochre-700: #7a5416;
 
   /* red — errors only */
   --p-red-50: #fff1f1;
@@ -91,36 +107,43 @@
   --p-red-800: #891f1f;
   --p-red-900: #721f1f;
 
-  /* violet — quantum SVM */
-  --p-violet-50: #f5f3ff;
-  --p-violet-100: #ece8ff;
-  --p-violet-200: #dcd4fe;
-  --p-violet-300: #c2b4fc;
-  --p-violet-400: #a990f9;
-  --p-violet-500: #8a63f1;
-  --p-violet-600: #7646e4;
-  --p-violet-700: #6236c8;
-  --p-violet-800: #512fa3;
-  --p-violet-900: #432a83;
-
-  /* 4px spacing grid */
+  /* 4px spacing grid (with 1px and 2px half-steps) */
   --p-space-0: 0;
   --p-space-px: 1px;
   --p-space-0-5: 2px;
   --p-space-1: 4px;
   --p-space-1-5: 6px;
   --p-space-2: 8px;
+  --p-space-2-5: 10px;
   --p-space-3: 12px;
   --p-space-4: 16px;
   --p-space-5: 20px;
   --p-space-6: 24px;
   --p-space-7: 28px;
   --p-space-8: 32px;
+  --p-space-9: 36px;
   --p-space-10: 40px;
   --p-space-12: 48px;
   --p-space-16: 64px;
+  --p-space-18: 72px;
 
-  /* type scale (1.125 minor-second-ish, rem so it honours browser zoom) */
+  /* measures (rem so they scale with browser text size) */
+  --p-measure-4: 4.25rem;
+  --p-measure-8: 7.5rem;
+  --p-measure-9: 9rem;
+  --p-measure-10: 10rem;
+  --p-measure-11: 11rem;
+  --p-measure-13: 13rem;
+  --p-measure-15: 15rem;
+  --p-measure-18: 18rem;
+  --p-measure-24: 24rem;
+  --p-measure-26: 26rem;
+  --p-measure-28: 27.5rem;
+  --p-measure-38: 37.5rem;
+  --p-measure-48: 48rem;
+
+  /* type scale (rem so it honours browser zoom) */
+  --p-font-11: 0.6875rem;
   --p-font-12: 0.75rem;
   --p-font-13: 0.8125rem;
   --p-font-14: 0.875rem;
@@ -132,14 +155,27 @@
   --p-font-30: 1.875rem;
   --p-font-36: 2.25rem;
 
+  --p-family-inter: "Inter", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --p-family-jetbrains: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --p-family-serif: Georgia, "Times New Roman", serif;
+
   --p-weight-regular: 400;
   --p-weight-medium: 500;
   --p-weight-semibold: 600;
   --p-weight-bold: 700;
 
+  --p-leading-none: 1;
+  --p-leading-display: 1.05;
   --p-leading-tight: 1.2;
   --p-leading-snug: 1.35;
   --p-leading-normal: 1.55;
+
+  --p-tracking-tighter: -0.025em;
+  --p-tracking-tight: -0.02em;
+  --p-tracking-snug: -0.012em;
+  --p-tracking-wide: 0.04em;
+  --p-tracking-wider: 0.08em;
+  --p-tracking-widest: 0.1em;
 
   --p-radius-2: 2px;
   --p-radius-4: 4px;
@@ -148,16 +184,31 @@
   --p-radius-12: 12px;
   --p-radius-16: 16px;
   --p-radius-full: 999px;
+  --p-radius-round: 50%;
 
+  --p-border-1: 1px;
+  --p-border-2: 2px;
+  --p-border-3: 3px;
+
+  --p-opacity-35: 0.35;
+  --p-opacity-55: 0.55;
+  --p-opacity-65: 0.65;
+  --p-opacity-85: 0.85;
+
+  --p-duration-80: 80ms;
   --p-duration-100: 100ms;
   --p-duration-150: 150ms;
   --p-duration-200: 200ms;
   --p-duration-300: 300ms;
   --p-duration-450: 450ms;
   --p-duration-700: 700ms;
+  --p-duration-800: 800ms;
+  --p-duration-1400: 1400ms;
   --p-ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --p-ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --p-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
   --p-ease-spring: cubic-bezier(0.34, 1.32, 0.64, 1);
+  --p-ease-linear: linear;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -167,86 +218,135 @@
   color-scheme: light;
 
   /* surfaces */
-  --color-bg: var(--p-gray-50);
-  --color-surface: var(--p-gray-0);
-  --color-surface-raised: var(--p-gray-0);
-  --color-surface-sunken: var(--p-gray-100);
-  --color-surface-hover: var(--p-gray-25);
-  --color-surface-inverse: var(--p-gray-900);
-  --color-overlay: rgb(14 18 23 / 0.55);
+  --color-bg: var(--p-paper-50);
+  --color-surface: var(--p-ink-0);
+  --color-surface-raised: var(--p-ink-0);
+  --color-surface-sunken: var(--p-deep-50);
+  --color-surface-hover: var(--p-deep-25);
+  --color-surface-inverse: var(--p-deep-900);
+  --color-overlay: rgb(4 13 18 / 0.55);
 
   /* lines */
-  --color-border: var(--p-gray-200);
-  --color-border-strong: var(--p-gray-300);
-  --color-divider: var(--p-gray-150);
+  --color-border: var(--p-deep-150);
+  --color-border-strong: var(--p-deep-300);
+  --color-divider: var(--p-deep-100);
 
   /* text */
-  --color-text: var(--p-gray-900);
-  --color-text-muted: var(--p-gray-600);
-  --color-text-subtle: var(--p-gray-500);
-  --color-text-inverse: var(--p-gray-0);
-  --color-text-link: var(--p-blue-600);
+  --color-text: var(--p-deep-900);
+  --color-text-muted: var(--p-deep-600);
+  --color-text-subtle: var(--p-deep-500);
+  --color-text-inverse: var(--p-ink-0);
+  --color-text-link: var(--p-deep-700);
 
   /* brand / interactive */
-  --color-accent: var(--p-blue-600);
-  --color-accent-hover: var(--p-blue-700);
-  --color-accent-soft: var(--p-blue-50);
-  --color-accent-border: var(--p-blue-200);
-  --color-accent-text: var(--p-blue-700);
-  --color-on-accent: var(--p-gray-0);
-  --color-focus-ring: var(--p-blue-500);
+  --color-accent: var(--p-deep-700);
+  --color-accent-hover: var(--p-deep-650);
+  --color-accent-soft: var(--p-deep-100);
+  --color-accent-border: var(--p-deep-300);
+  --color-accent-text: var(--p-deep-700);
+  --color-on-accent: var(--p-ink-0);
+  --color-on-danger: var(--p-ink-0);
+  --color-focus-ring: var(--p-deep-500);
 
   /* status pairs (fg on bg, plus a border) */
-  --color-success-fg: var(--p-teal-700);
-  --color-success-bg: var(--p-teal-50);
-  --color-success-border: var(--p-teal-200);
-  --color-warning-fg: var(--p-amber-700);
-  --color-warning-bg: var(--p-amber-50);
-  --color-warning-border: var(--p-amber-200);
+  --color-success-fg: var(--p-sage-700);
+  --color-success-bg: var(--p-sage-50);
+  --color-success-border: var(--p-sage-200);
+  --color-warning-fg: var(--p-ochre-700);
+  --color-warning-bg: var(--p-ochre-50);
+  --color-warning-border: var(--p-ochre-200);
   --color-danger-fg: var(--p-red-700);
   --color-danger-bg: var(--p-red-50);
   --color-danger-border: var(--p-red-200);
   --color-danger-solid: var(--p-red-600);
-  --color-info-fg: var(--p-blue-700);
-  --color-info-bg: var(--p-blue-50);
-  --color-info-border: var(--p-blue-200);
-  --color-neutral-fg: var(--p-gray-600);
-  --color-neutral-bg: var(--p-gray-100);
-  --color-neutral-border: var(--p-gray-200);
+  --color-info-fg: var(--p-deep-700);
+  --color-info-bg: var(--p-deep-50);
+  --color-info-border: var(--p-deep-150);
+  --color-neutral-fg: var(--p-deep-600);
+  --color-neutral-bg: var(--p-deep-50);
+  --color-neutral-border: var(--p-deep-150);
 
   /* domain: model classes and models */
-  --color-class-negative: var(--p-teal-600);
-  --color-class-negative-soft: var(--p-teal-50);
-  --color-class-positive: var(--p-amber-600);
-  --color-class-positive-soft: var(--p-amber-50);
-  --color-model-svm: var(--p-blue-600);
-  --color-model-svm-soft: var(--p-blue-50);
-  --color-model-qsvm: var(--p-violet-600);
-  --color-model-qsvm-soft: var(--p-violet-50);
-  --color-on-model: var(--p-gray-0);
-  --color-chart-mmse: var(--p-blue-600);
-  --color-chart-cdr: var(--p-amber-600);
-  --color-chart-grid: var(--p-gray-150);
+  --color-class-negative: var(--p-sage-600);
+  --color-class-negative-soft: var(--p-sage-50);
+  --color-class-positive: var(--p-ochre-600);
+  --color-class-positive-soft: var(--p-ochre-50);
+  --color-model-svm: var(--p-deep-700);
+  --color-model-svm-soft: var(--p-deep-50);
+  --color-model-qsvm: var(--p-tide-600);
+  --color-model-qsvm-soft: var(--p-tide-50);
+  --color-on-model: var(--p-ink-0);
+  --color-chart-mmse: var(--p-deep-700);
+  --color-chart-cdr: var(--p-ochre-600);
+  --color-chart-grid: var(--p-deep-100);
+
+  /* MRI viewer — always dark, whatever the theme, so a scan reads correctly */
+  --color-scan-bg: var(--p-deep-950);
+  --color-scan-text: var(--p-deep-100);
+  --color-scan-overlay: rgb(0 0 0 / 0.55);
+
+  /* colour-mix weights (how much of a hue bleeds into a neighbour) */
+  --mix-subtle: 8%;
+  --mix-wash: 7%;
+  --mix-track: 25%;
+  --mix-border: 35%;
+  --mix-strong: 45%;
+  --mix-nav: 86%;
+
+  /* derived surfaces */
+  --color-auth-wash: color-mix(in srgb, var(--color-accent) var(--mix-wash), var(--color-bg));
+  --color-nav-bg: color-mix(in srgb, var(--color-surface) var(--mix-nav), transparent);
 
   /* elevation */
-  --shadow-xs: 0 1px 1px rgb(16 32 51 / 0.04);
-  --shadow-sm: 0 1px 2px rgb(16 32 51 / 0.06), 0 1px 3px rgb(16 32 51 / 0.04);
-  --shadow-md: 0 2px 4px rgb(16 32 51 / 0.04), 0 8px 24px rgb(16 32 51 / 0.07);
-  --shadow-lg: 0 12px 32px rgb(16 32 51 / 0.12), 0 2px 6px rgb(16 32 51 / 0.06);
+  --shadow-xs: 0 1px 1px rgb(4 13 18 / 0.04);
+  --shadow-sm: 0 1px 2px rgb(4 13 18 / 0.06), 0 1px 3px rgb(4 13 18 / 0.04);
+  --shadow-md: 0 2px 4px rgb(4 13 18 / 0.04), 0 8px 24px rgb(4 13 18 / 0.07);
+  --shadow-lg: 0 12px 32px rgb(4 13 18 / 0.12), 0 2px 6px rgb(4 13 18 / 0.06);
+  --nav-backdrop: saturate(1.4) blur(10px);
 
   /* spacing roles */
+  --space-px: var(--p-space-px);
+  --space-3xs: var(--p-space-0-5);
   --space-2xs: var(--p-space-1);
+  --space-inline: var(--p-space-1-5); /* icon/dot <-> label */
   --space-xs: var(--p-space-2);
   --space-sm: var(--p-space-3);
   --space-md: var(--p-space-4);
   --space-lg: var(--p-space-6);
   --space-xl: var(--p-space-8);
   --space-2xl: var(--p-space-12);
-  --gutter: clamp(16px, 4vw, 32px);
+  --gutter: clamp(var(--p-space-4), 4vw, var(--p-space-8));
+  --list-indent: var(--p-space-5);
+
+  /* sizes (icons, dots, avatars) */
+  --size-dot-sm: var(--p-space-1-5);
+  --size-dot: var(--p-space-2);
+  --size-dot-lg: var(--p-space-2-5);
+  --size-icon-xs: var(--p-space-4);
+  --size-icon-sm: var(--p-space-5);
+  --size-icon-md: var(--p-space-6);
+  --size-avatar: var(--p-space-7);
+  --size-icon-lg: var(--p-space-8);
+  --size-icon-xl: var(--p-space-10);
+  --size-icon-2xl: var(--p-space-12);
+  --size-logo: var(--p-space-18);
+  --size-viewport: 100vh;
+
+  /* widths */
+  --width-auth: var(--p-measure-28);
+  --width-auth-wide: var(--p-measure-38);
+  --width-form: var(--p-measure-26);
+  --width-media: var(--p-measure-24);
+  --width-prose: var(--p-measure-48);
+  --grid-min-sm: var(--p-measure-11);
+  --grid-min-md: var(--p-measure-13);
+  --grid-min-lg: var(--p-measure-18);
 
   /* typography roles */
-  --font-sans: "Inter", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --font-sans: var(--p-family-inter);
+  --font-mono: var(--p-family-jetbrains);
+  --font-serif: var(--p-family-serif);
+  --text-micro: var(--p-font-11);
   --text-caption: var(--p-font-12);
   --text-small: var(--p-font-13);
   --text-body-sm: var(--p-font-14);
@@ -254,36 +354,82 @@
   --text-lead: var(--p-font-16);
   --text-h3: var(--p-font-16);
   --text-h2: var(--p-font-18);
+  --text-icon: var(--p-font-24);
+  --text-stat: var(--p-font-24);
+  --text-timer: var(--p-font-30);
   --text-h1: clamp(var(--p-font-24), 2.4vw + 0.9rem, var(--p-font-30));
   --text-display: clamp(var(--p-font-30), 3vw + 1rem, var(--p-font-36));
+  --text-code: 0.9em; /* relative: code sits inside running text */
   --weight-regular: var(--p-weight-regular);
   --weight-medium: var(--p-weight-medium);
   --weight-semibold: var(--p-weight-semibold);
   --weight-bold: var(--p-weight-bold);
+  --leading-none: var(--p-leading-none);
+  --leading-display: var(--p-leading-display);
   --leading-tight: var(--p-leading-tight);
   --leading-snug: var(--p-leading-snug);
   --leading-body: var(--p-leading-normal);
+  --tracking-display: var(--p-tracking-tighter);
+  --tracking-title: var(--p-tracking-tight);
+  --tracking-heading: var(--p-tracking-snug);
+  --tracking-label: var(--p-tracking-wide);
+  --tracking-eyebrow: var(--p-tracking-wider);
+  --tracking-brand: var(--p-tracking-widest);
+  --link-underline-offset: 0.18em;
 
   /* shape */
+  --radius-2xs: var(--p-radius-2);
+  --radius-xs: var(--p-radius-4);
   --radius-sm: var(--p-radius-6);
   --radius-md: var(--p-radius-8);
   --radius-lg: var(--p-radius-12);
   --radius-xl: var(--p-radius-16);
   --radius-pill: var(--p-radius-full);
+  --radius-round: var(--p-radius-round);
+  --border-width: var(--p-border-1);
+  --border-width-thick: var(--p-border-2);
+  --border-width-heavy: var(--p-border-3);
+  --focus-ring-width: var(--p-border-2);
+  --focus-ring-offset: var(--p-border-2);
+  --focus-halo-width: var(--p-border-3);
+
+  /* opacity */
+  --opacity-muted: var(--p-opacity-35);
+  --opacity-disabled: var(--p-opacity-55);
+  --opacity-medium: var(--p-opacity-65);
+  --opacity-strong: var(--p-opacity-85);
 
   /* motion */
+  --motion-instant: var(--p-duration-80);
   --motion-fast: var(--p-duration-150);
   --motion-base: var(--p-duration-200);
   --motion-slow: var(--p-duration-450);
   --motion-emphasis: var(--p-duration-700);
+  --motion-spin: var(--p-duration-800);
+  --motion-shimmer: var(--p-duration-1400);
   --ease-standard: var(--p-ease-standard);
   --ease-out: var(--p-ease-out);
+  --ease-in-out: var(--p-ease-in-out);
   --ease-spring: var(--p-ease-spring);
+  --ease-linear: var(--p-ease-linear);
+  --motion-press-offset: var(--p-space-px);
+  --motion-drop-offset: var(--p-space-1);
+  --motion-rise-offset: var(--p-space-1-5);
+  --motion-enter-blur: var(--p-space-0-5);
+  --scale-hover: 1.01;
+  --scale-press: 0.997;
+  --scale-enter: 0.97;
+  --scale-muted: 0.72;
+  --scale-hidden: 0.3;
 
   /* layout */
   --page-max: 1080px;
   --page-narrow: 760px;
+  --page-padding-top: clamp(var(--space-lg), 4vw, var(--p-space-10));
   --nav-height: 60px;
+  --z-below: -1;
+  --z-raised: 1;
+  --z-raised-top: 2;
   --z-nav: 50;
   --z-overlay: 100;
 
@@ -294,16 +440,66 @@
   --button-height-sm: 32px;
   --button-padding-x: var(--p-space-4);
   --button-radius: var(--radius-md);
+
   --field-height: 42px;
   --field-radius: var(--radius-md);
+  --field-padding-y: var(--p-space-2);
+  --field-padding-x: var(--p-space-3);
+  --field-padding-select: var(--p-space-9);
+  --field-textarea-height: 96px;
   --field-bg: var(--color-surface);
   --field-border: var(--color-border-strong);
   --field-bg-readonly: var(--color-surface-sunken);
+  --select-chevron-size: 5px;
+  --select-chevron-inset: 13px;
+
   --card-padding: clamp(var(--p-space-4), 2.6vw, var(--p-space-7));
+  --card-padding-auth: clamp(var(--space-lg), 5vw, var(--p-space-10));
   --card-radius: var(--radius-lg);
   --card-shadow: var(--shadow-sm);
+
+  --badge-padding-y: var(--p-space-0-5);
+  --badge-padding-x: var(--p-space-2-5);
+
+  --segmented-inset: var(--p-space-0-5);
+  --segmented-height: 34px;
+  --segmented-thumb-radius: calc(var(--radius-md) - var(--segmented-inset));
+
+  --skeleton-line-height: 0.9em;
+  --dropzone-min-height: var(--p-measure-11);
+  --waveform-height: var(--p-space-18);
+  --waveform-gap: var(--p-space-0-5);
+  --waveform-bar-width: var(--p-space-1);
+  --waveform-bar-min: var(--p-space-1-5);
+  --scan-viewer-height: clamp(280px, 45vh, 440px);
+  --accent-bar-height: var(--p-space-1);
+  --icon-stroke: var(--p-border-2);
+  --auth-wash-shape: 75rem 38rem at 50% -24%;
+  --auth-wash-fade: 68%;
+
+  --verdict-min-width: var(--p-measure-15);
   --chart-track-height: 16px;
   --chart-marker-size: 18px;
+  --chart-bar-height: var(--p-space-2-5);
+  --chart-pad-top: var(--p-space-8);
+  --chart-pad-bottom: var(--p-space-7);
+  --chart-pad-bottom-compare: calc(var(--chart-pad-bottom) + var(--p-space-7));
+  --chart-boundary-top: var(--p-space-3);
+  --chart-boundary-bottom: var(--p-space-4);
+  --chart-swatch-width: var(--p-space-3);
+  --chart-min-width: 420px;
+  --chart-grid-stroke: var(--p-border-1);
+  --chart-line-stroke: 2.25px;
+  --chart-dot-radius: var(--p-space-1);
+  --metric-label-width: var(--p-measure-8);
+  --metric-value-width: var(--p-measure-4);
+
+  --ds-swatch-min: var(--p-measure-9);
+  --ds-swatch-height: var(--p-space-12);
+  --ds-ramp-height: var(--p-space-8);
+  --ds-label-col: var(--p-measure-9);
+  --ds-demo-width: var(--p-measure-10);
+  --ds-demo-height: var(--p-space-16);
 
   /* Legacy aliases (pre-design-system names some screens still read). */
   --bg: var(--color-bg);
@@ -331,56 +527,57 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --color-bg: var(--p-gray-950);
-    --color-surface: var(--p-gray-900);
-    --color-surface-raised: var(--p-gray-850);
-    --color-surface-sunken: #0a0d11;
-    --color-surface-hover: var(--p-gray-850);
-    --color-surface-inverse: var(--p-gray-50);
+    --color-bg: var(--p-deep-900);
+    --color-surface: var(--p-deep-850);
+    --color-surface-raised: var(--p-deep-800);
+    --color-surface-sunken: var(--p-deep-950);
+    --color-surface-hover: var(--p-deep-800);
+    --color-surface-inverse: var(--p-deep-100);
     --color-overlay: rgb(0 0 0 / 0.65);
-    --color-border: var(--p-gray-800);
-    --color-border-strong: var(--p-gray-700);
-    --color-divider: var(--p-gray-850);
-    --color-text: var(--p-gray-50);
-    --color-text-muted: var(--p-gray-400);
-    --color-text-subtle: var(--p-gray-500);
-    --color-text-inverse: var(--p-gray-950);
-    --color-text-link: var(--p-blue-300);
-    --color-accent: var(--p-blue-500);
-    --color-accent-hover: var(--p-blue-400);
-    --color-accent-soft: rgb(58 111 232 / 0.16);
-    --color-accent-border: rgb(109 156 246 / 0.4);
-    --color-accent-text: var(--p-blue-300);
-    --color-on-accent: var(--p-gray-0);
-    --color-focus-ring: var(--p-blue-400);
-    --color-success-fg: var(--p-teal-300);
-    --color-success-bg: rgb(23 156 130 / 0.14);
-    --color-success-border: rgb(54 185 157 / 0.35);
-    --color-warning-fg: var(--p-amber-300);
-    --color-warning-bg: rgb(217 134 15 / 0.14);
-    --color-warning-border: rgb(242 163 37 / 0.35);
+    --color-border: var(--p-deep-700);
+    --color-border-strong: var(--p-deep-500);
+    --color-divider: var(--p-deep-750);
+    --color-text: var(--p-deep-100);
+    --color-text-muted: var(--p-deep-300);
+    --color-text-subtle: var(--p-deep-500);
+    --color-text-inverse: var(--p-deep-900);
+    --color-text-link: var(--p-deep-200);
+    --color-accent: var(--p-deep-300);
+    --color-accent-hover: var(--p-deep-200);
+    --color-accent-soft: var(--p-deep-700);
+    --color-accent-border: var(--p-deep-500);
+    --color-accent-text: var(--p-deep-200);
+    --color-on-accent: var(--p-deep-900);
+    --color-on-danger: var(--p-ink-0);
+    --color-focus-ring: var(--p-deep-300);
+    --color-success-fg: var(--p-mint-300);
+    --color-success-bg: rgb(127 203 159 / 0.12);
+    --color-success-border: rgb(127 203 159 / 0.3);
+    --color-warning-fg: var(--p-gold-300);
+    --color-warning-bg: rgb(221 176 112 / 0.12);
+    --color-warning-border: rgb(221 176 112 / 0.3);
     --color-danger-fg: var(--p-red-300);
     --color-danger-bg: rgb(230 59 59 / 0.14);
     --color-danger-border: rgb(246 107 107 / 0.35);
     --color-danger-solid: var(--p-red-600);
-    --color-info-fg: var(--p-blue-300);
-    --color-info-bg: rgb(58 111 232 / 0.14);
-    --color-info-border: rgb(109 156 246 / 0.35);
-    --color-neutral-fg: var(--p-gray-300);
-    --color-neutral-bg: var(--p-gray-850);
-    --color-neutral-border: var(--p-gray-800);
-    --color-class-negative: var(--p-teal-400);
-    --color-class-negative-soft: rgb(23 156 130 / 0.16);
-    --color-class-positive: var(--p-amber-400);
-    --color-class-positive-soft: rgb(217 134 15 / 0.16);
-    --color-model-svm: var(--p-blue-400);
-    --color-model-svm-soft: rgb(58 111 232 / 0.16);
-    --color-model-qsvm: var(--p-violet-400);
-    --color-model-qsvm-soft: rgb(138 99 241 / 0.18);
-    --color-on-model: var(--p-gray-950);
-    --color-chart-mmse: var(--p-blue-400);
-    --color-chart-cdr: var(--p-amber-400);
-    --color-chart-grid: var(--p-gray-800);
+    --color-info-fg: var(--p-deep-200);
+    --color-info-bg: rgb(147 177 166 / 0.1);
+    --color-info-border: rgb(147 177 166 / 0.3);
+    --color-neutral-fg: var(--p-deep-300);
+    --color-neutral-bg: var(--p-deep-750);
+    --color-neutral-border: var(--p-deep-700);
+    --color-class-negative: var(--p-mint-300);
+    --color-class-negative-soft: rgb(127 203 159 / 0.14);
+    --color-class-positive: var(--p-gold-300);
+    --color-class-positive-soft: rgb(221 176 112 / 0.14);
+    --color-model-svm: var(--p-deep-200);
+    --color-model-svm-soft: rgb(147 177 166 / 0.1);
+    --color-model-qsvm: var(--p-tide-400);
+    --color-model-qsvm-soft: rgb(76 155 176 / 0.14);
+    --color-on-model: var(--p-deep-900);
+    --color-chart-mmse: var(--p-deep-200);
+    --color-chart-cdr: var(--p-gold-300);
+    --color-chart-grid: var(--p-deep-700);
     --shadow-xs: none;
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
     --shadow-md: 0 8px 24px rgb(0 0 0 / 0.45);
@@ -391,64 +588,82 @@
 /* Explicit dark choice — identical values to the OS-dark block above. */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-bg: var(--p-gray-950);
-  --color-surface: var(--p-gray-900);
-  --color-surface-raised: var(--p-gray-850);
-  --color-surface-sunken: #0a0d11;
-  --color-surface-hover: var(--p-gray-850);
-  --color-surface-inverse: var(--p-gray-50);
+  --color-bg: var(--p-deep-900);
+  --color-surface: var(--p-deep-850);
+  --color-surface-raised: var(--p-deep-800);
+  --color-surface-sunken: var(--p-deep-950);
+  --color-surface-hover: var(--p-deep-800);
+  --color-surface-inverse: var(--p-deep-100);
   --color-overlay: rgb(0 0 0 / 0.65);
-  --color-border: var(--p-gray-800);
-  --color-border-strong: var(--p-gray-700);
-  --color-divider: var(--p-gray-850);
-  --color-text: var(--p-gray-50);
-  --color-text-muted: var(--p-gray-400);
-  --color-text-subtle: var(--p-gray-500);
-  --color-text-inverse: var(--p-gray-950);
-  --color-text-link: var(--p-blue-300);
-  --color-accent: var(--p-blue-500);
-  --color-accent-hover: var(--p-blue-400);
-  --color-accent-soft: rgb(58 111 232 / 0.16);
-  --color-accent-border: rgb(109 156 246 / 0.4);
-  --color-accent-text: var(--p-blue-300);
-  --color-on-accent: var(--p-gray-0);
-  --color-focus-ring: var(--p-blue-400);
-  --color-success-fg: var(--p-teal-300);
-  --color-success-bg: rgb(23 156 130 / 0.14);
-  --color-success-border: rgb(54 185 157 / 0.35);
-  --color-warning-fg: var(--p-amber-300);
-  --color-warning-bg: rgb(217 134 15 / 0.14);
-  --color-warning-border: rgb(242 163 37 / 0.35);
+  --color-border: var(--p-deep-700);
+  --color-border-strong: var(--p-deep-500);
+  --color-divider: var(--p-deep-750);
+  --color-text: var(--p-deep-100);
+  --color-text-muted: var(--p-deep-300);
+  --color-text-subtle: var(--p-deep-500);
+  --color-text-inverse: var(--p-deep-900);
+  --color-text-link: var(--p-deep-200);
+  --color-accent: var(--p-deep-300);
+  --color-accent-hover: var(--p-deep-200);
+  --color-accent-soft: var(--p-deep-700);
+  --color-accent-border: var(--p-deep-500);
+  --color-accent-text: var(--p-deep-200);
+  --color-on-accent: var(--p-deep-900);
+  --color-on-danger: var(--p-ink-0);
+  --color-focus-ring: var(--p-deep-300);
+  --color-success-fg: var(--p-mint-300);
+  --color-success-bg: rgb(127 203 159 / 0.12);
+  --color-success-border: rgb(127 203 159 / 0.3);
+  --color-warning-fg: var(--p-gold-300);
+  --color-warning-bg: rgb(221 176 112 / 0.12);
+  --color-warning-border: rgb(221 176 112 / 0.3);
   --color-danger-fg: var(--p-red-300);
   --color-danger-bg: rgb(230 59 59 / 0.14);
   --color-danger-border: rgb(246 107 107 / 0.35);
   --color-danger-solid: var(--p-red-600);
-  --color-info-fg: var(--p-blue-300);
-  --color-info-bg: rgb(58 111 232 / 0.14);
-  --color-info-border: rgb(109 156 246 / 0.35);
-  --color-neutral-fg: var(--p-gray-300);
-  --color-neutral-bg: var(--p-gray-850);
-  --color-neutral-border: var(--p-gray-800);
-  --color-class-negative: var(--p-teal-400);
-  --color-class-negative-soft: rgb(23 156 130 / 0.16);
-  --color-class-positive: var(--p-amber-400);
-  --color-class-positive-soft: rgb(217 134 15 / 0.16);
-  --color-model-svm: var(--p-blue-400);
-  --color-model-svm-soft: rgb(58 111 232 / 0.16);
-  --color-model-qsvm: var(--p-violet-400);
-  --color-model-qsvm-soft: rgb(138 99 241 / 0.18);
-  --color-on-model: var(--p-gray-950);
-  --color-chart-mmse: var(--p-blue-400);
-  --color-chart-cdr: var(--p-amber-400);
-  --color-chart-grid: var(--p-gray-800);
+  --color-info-fg: var(--p-deep-200);
+  --color-info-bg: rgb(147 177 166 / 0.1);
+  --color-info-border: rgb(147 177 166 / 0.3);
+  --color-neutral-fg: var(--p-deep-300);
+  --color-neutral-bg: var(--p-deep-750);
+  --color-neutral-border: var(--p-deep-700);
+  --color-class-negative: var(--p-mint-300);
+  --color-class-negative-soft: rgb(127 203 159 / 0.14);
+  --color-class-positive: var(--p-gold-300);
+  --color-class-positive-soft: rgb(221 176 112 / 0.14);
+  --color-model-svm: var(--p-deep-200);
+  --color-model-svm-soft: rgb(147 177 166 / 0.1);
+  --color-model-qsvm: var(--p-tide-400);
+  --color-model-qsvm-soft: rgb(76 155 176 / 0.14);
+  --color-on-model: var(--p-deep-900);
+  --color-chart-mmse: var(--p-deep-200);
+  --color-chart-cdr: var(--p-gold-300);
+  --color-chart-grid: var(--p-deep-700);
   --shadow-xs: none;
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow-md: 0 8px 24px rgb(0 0 0 / 0.45);
   --shadow-lg: 0 16px 40px rgb(0 0 0 / 0.55);
 }
 
+/* ------------------------------------------------------------------------- */
+/* 2c. SEMANTIC — print. Paper is always light, whatever theme is on screen.  */
+/*     (:not(#id) raises specificity above both dark-theme selectors.)       */
+/* ------------------------------------------------------------------------- */
+@media print {
+  html:not(#print-light) {
+    color-scheme: light;
+    --color-bg: var(--p-ink-0);
+    --color-surface: var(--p-ink-0);
+    --color-surface-sunken: var(--p-deep-50);
+    --color-border: var(--p-deep-150);
+    --color-text: var(--p-deep-900);
+    --color-text-muted: var(--p-deep-600);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root {
+    --motion-instant: 0ms;
     --motion-fast: 0ms;
     --motion-base: 0ms;
     --motion-slow: 0ms;

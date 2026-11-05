@@ -55,7 +55,7 @@ export default function MriExtractionNote({ visit }) {
       ) : null}
       {warnings.length > 0 ? (
         <div className="notice notice--warning" role="note">
-          <ul style={{ margin: 0, paddingLeft: "1rem" }}>
+          <ul style={{ margin: 0, paddingLeft: "var(--list-indent)" }}>
             {warnings.map((warning) => (
               <li key={warning}>{warning}</li>
             ))}

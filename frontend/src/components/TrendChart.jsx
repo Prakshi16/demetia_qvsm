@@ -129,7 +129,6 @@ export default function TrendChart({ points }) {
                   className="trend-dot trend-dot--mmse"
                   cx={x(index)}
                   cy={yFor(point.mmse, MMSE_MAX)}
-                  r="4"
                 >
                   <title>{`${formatDate(point.visit_date)} — MMSE ${point.mmse}`}</title>
                 </circle>
@@ -139,7 +138,6 @@ export default function TrendChart({ points }) {
                   className="trend-dot trend-dot--cdr"
                   cx={x(index)}
                   cy={yFor(point.cdr, CDR_MAX)}
-                  r="4"
                 >
                   <title>{`${formatDate(point.visit_date)} — CDR ${point.cdr}`}</title>
                 </circle>

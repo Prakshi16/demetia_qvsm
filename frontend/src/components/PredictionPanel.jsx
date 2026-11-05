@@ -200,14 +200,14 @@ function CompareVerdict({ outputs, agreement }) {
         Side by side
       </p>
       {["svm", "qsvm"].map((key) => (
-        <div key={key} style={{ display: "grid", gap: 2 }}>
+        <div key={key} style={{ display: "grid", gap: "var(--space-3xs)" }}>
           <span className="verdict-model" style={{ color: `var(--color-model-${key})` }}>
             {MODEL_META[key].name}
           </span>
           <span
             className="verdict-label"
             data-class={outputs[key].label}
-            style={{ fontSize: "var(--p-font-24)" }}
+            style={{ fontSize: "var(--text-stat)" }}
             key={`cmp-${key}-${outputs[key].label}`}
           >
             {outputs[key].label}
@@ -250,7 +250,7 @@ function DecisionAxis({ outputs, scales, view, settled }) {
       <p className="decision-chart-title">
         Position relative to the decision boundary <span>axis: {rangeLabel}</span>
       </p>
-      <div className="decision-plot" role="img" aria-label={describeAxis(outputs, view)}>
+      <div className="decision-plot" data-view={view} role="img" aria-label={describeAxis(outputs, view)}>
         <span className="decision-boundary-label">boundary</span>
         <div className="decision-track" />
         <span className="decision-boundary" aria-hidden="true" />
@@ -261,7 +261,7 @@ function DecisionAxis({ outputs, scales, view, settled }) {
             data-model={marker.key}
             data-state={marker.state}
             data-tag={view === "compare" && marker.key === "qsvm" ? "below" : "above"}
-            style={{ "--x": `${marker.x}%`, zIndex: marker.state === "active" ? 2 : 1 }}
+            style={{ "--x": `${marker.x}%`, zIndex: marker.state === "active" ? "var(--z-raised-top)" : "var(--z-raised)" }}
           >
             <span className="decision-marker-tag">
               {MODEL_META[marker.key].short} {formatSigned(marker.value)}
