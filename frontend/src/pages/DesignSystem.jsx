@@ -8,7 +8,9 @@
 import { useState } from "react";
 
 import MriExtractionNote from "../components/MriExtractionNote";
+import MriUpload from "../components/MriUpload";
 import PredictionPanel from "../components/PredictionPanel";
+import SpeechCapture from "../components/SpeechCapture";
 import NumberField from "../components/ui/NumberField";
 import SegmentedControl from "../components/ui/SegmentedControl";
 import { useTheme } from "../theme/useTheme";
@@ -51,6 +53,10 @@ const TYPE = [
   ["--text-small", "Small — hints, meta", 400],
   ["--text-caption", "Caption — labels, badges", 600],
 ];
+
+// The all-zero UUID never matches a visit: the upload endpoints answer 404
+// before touching storage, so trying the samples below stores nothing.
+const DEMO_VISIT_ID = "00000000-0000-0000-0000-000000000000";
 
 const SPACE = ["--space-2xs", "--space-xs", "--space-sm", "--space-md", "--space-lg", "--space-xl", "--space-2xl"];
 
@@ -273,6 +279,17 @@ export default function DesignSystem() {
           />
           <span className="spinner" aria-label="Loading" />
           <span className="skeleton" style={{ width: "var(--ds-demo-width)" }} />
+        </div>
+      </Section>
+
+      <Section
+        id="ds-uploads"
+        title="Uploads"
+        intro="The MRI drop zone and the speech recorder from the screening visit, live. They point at a visit that doesn't exist, so choosing a file here shows the error state and nothing is stored."
+      >
+        <div className="ds-grid-2">
+          <MriUpload visitId={DEMO_VISIT_ID} onDone={() => {}} />
+          <SpeechCapture visitId={DEMO_VISIT_ID} onDone={() => {}} />
         </div>
       </Section>
 

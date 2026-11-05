@@ -14,6 +14,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/useAuth";
 import { validatePassword } from "../utils/validate";
+import FieldError from "../components/ui/FieldError";
 
 export default function ChangePassword() {
   const { user, changePassword } = useAuth();
@@ -26,17 +27,28 @@ export default function ChangePassword() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [touched, setTouched] = useState({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
+  const values = { newPassword, confirm };
+  const fieldErrors = {
+    newPassword:
+      validatePassword(newPassword) ||
+      (currentPassword && newPassword === currentPassword
+        ? "The new password must be different from the current one."
+        : null),
+    confirm: confirm !== newPassword ? "The new passwords don't match." : null,
+  };
+  // Errors show once a field has been left with something in it, or on submit.
+  const shown = (field) =>
+    ((submitAttempted || (touched[field] && values[field] !== "")) && fieldErrors[field]) || null;
+  const touch = (field) => () => setTouched((current) => ({ ...current, [field]: true }));
 
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
-
-    const formatError = validatePassword(newPassword);
-    if (formatError) return setError(formatError);
-    if (newPassword !== confirm) return setError("The new passwords don't match.");
-    if (newPassword === currentPassword) {
-      return setError("The new password must be different from the current one.");
-    }
+    setSubmitAttempted(true);
+    if (fieldErrors.newPassword || fieldErrors.confirm) return;
 
     setIsSubmitting(true);
     try {
@@ -90,10 +102,13 @@ export default function ChangePassword() {
             type="password"
             value={newPassword}
             onChange={(event) => setNewPassword(event.target.value)}
+            onBlur={touch("newPassword")}
+            aria-invalid={shown("newPassword") ? "true" : undefined}
             autoComplete="new-password"
             required
             disabled={isSubmitting}
           />
+          <FieldError message={shown("newPassword")} />
         </label>
 
         <label className="field">
@@ -102,10 +117,13 @@ export default function ChangePassword() {
             type="password"
             value={confirm}
             onChange={(event) => setConfirm(event.target.value)}
+            onBlur={touch("confirm")}
+            aria-invalid={shown("confirm") ? "true" : undefined}
             autoComplete="new-password"
             required
             disabled={isSubmitting}
           />
+          <FieldError message={shown("confirm")} />
         </label>
 
         {error ? (

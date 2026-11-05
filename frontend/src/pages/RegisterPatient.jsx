@@ -24,6 +24,7 @@ import {
   validatePhone,
   validateRelationship,
 } from "../utils/validate";
+import FieldError from "../components/ui/FieldError";
 
 function patientErrors(form, isGuardianConsent) {
   const errors = {
@@ -36,14 +37,6 @@ function patientErrors(form, isGuardianConsent) {
       : null,
   };
   return Object.fromEntries(Object.entries(errors).filter(([, message]) => message));
-}
-
-function FieldError({ message }) {
-  return message ? (
-    <span className="field-error" role="alert">
-      {message}
-    </span>
-  ) : null;
 }
 
 // Matches the consent_given_by Postgres enum ("patient" | "guardian").

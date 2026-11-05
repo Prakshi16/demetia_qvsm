@@ -263,7 +263,7 @@
   --color-info-bg: var(--p-deep-50);
   --color-info-border: var(--p-deep-150);
   --color-neutral-fg: var(--p-deep-600);
-  --color-neutral-bg: var(--p-deep-50);
+  --color-neutral-bg: var(--p-deep-100); /* one step off the sunken wells, so a chip on a well still shows */
   --color-neutral-border: var(--p-deep-150);
 
   /* domain: model classes and models */
@@ -522,9 +522,10 @@
 /* ------------------------------------------------------------------------- */
 /* 2b. SEMANTIC — dark theme. Follows the OS unless the user picked a theme   */
 /*     (html[data-theme="light"|"dark"], set by the nav's theme toggle).      */
+/*     Screen only: print always gets the full light theme (2c tweaks it).   */
 /*     Plain CSS has no mixins, so the two blocks below carry the same values. */
 /* ------------------------------------------------------------------------- */
-@media (prefers-color-scheme: dark) {
+@media screen and (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     --color-bg: var(--p-deep-900);
@@ -586,68 +587,70 @@
 }
 
 /* Explicit dark choice — identical values to the OS-dark block above. */
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --color-bg: var(--p-deep-900);
-  --color-surface: var(--p-deep-850);
-  --color-surface-raised: var(--p-deep-800);
-  --color-surface-sunken: var(--p-deep-950);
-  --color-surface-hover: var(--p-deep-800);
-  --color-surface-inverse: var(--p-deep-100);
-  --color-overlay: rgb(0 0 0 / 0.65);
-  --color-border: var(--p-deep-700);
-  --color-border-strong: var(--p-deep-500);
-  --color-divider: var(--p-deep-750);
-  --color-text: var(--p-deep-100);
-  --color-text-muted: var(--p-deep-300);
-  --color-text-subtle: var(--p-deep-500);
-  --color-text-inverse: var(--p-deep-900);
-  --color-text-link: var(--p-deep-200);
-  --color-accent: var(--p-deep-300);
-  --color-accent-hover: var(--p-deep-200);
-  --color-accent-soft: var(--p-deep-700);
-  --color-accent-border: var(--p-deep-500);
-  --color-accent-text: var(--p-deep-200);
-  --color-on-accent: var(--p-deep-900);
-  --color-on-danger: var(--p-ink-0);
-  --color-focus-ring: var(--p-deep-300);
-  --color-success-fg: var(--p-mint-300);
-  --color-success-bg: rgb(127 203 159 / 0.12);
-  --color-success-border: rgb(127 203 159 / 0.3);
-  --color-warning-fg: var(--p-gold-300);
-  --color-warning-bg: rgb(221 176 112 / 0.12);
-  --color-warning-border: rgb(221 176 112 / 0.3);
-  --color-danger-fg: var(--p-red-300);
-  --color-danger-bg: rgb(230 59 59 / 0.14);
-  --color-danger-border: rgb(246 107 107 / 0.35);
-  --color-danger-solid: var(--p-red-600);
-  --color-info-fg: var(--p-deep-200);
-  --color-info-bg: rgb(147 177 166 / 0.1);
-  --color-info-border: rgb(147 177 166 / 0.3);
-  --color-neutral-fg: var(--p-deep-300);
-  --color-neutral-bg: var(--p-deep-750);
-  --color-neutral-border: var(--p-deep-700);
-  --color-class-negative: var(--p-mint-300);
-  --color-class-negative-soft: rgb(127 203 159 / 0.14);
-  --color-class-positive: var(--p-gold-300);
-  --color-class-positive-soft: rgb(221 176 112 / 0.14);
-  --color-model-svm: var(--p-deep-200);
-  --color-model-svm-soft: rgb(147 177 166 / 0.1);
-  --color-model-qsvm: var(--p-tide-400);
-  --color-model-qsvm-soft: rgb(76 155 176 / 0.14);
-  --color-on-model: var(--p-deep-900);
-  --color-chart-mmse: var(--p-deep-200);
-  --color-chart-cdr: var(--p-gold-300);
-  --color-chart-grid: var(--p-deep-700);
-  --shadow-xs: none;
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-md: 0 8px 24px rgb(0 0 0 / 0.45);
-  --shadow-lg: 0 16px 40px rgb(0 0 0 / 0.55);
+@media screen {
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --color-bg: var(--p-deep-900);
+    --color-surface: var(--p-deep-850);
+    --color-surface-raised: var(--p-deep-800);
+    --color-surface-sunken: var(--p-deep-950);
+    --color-surface-hover: var(--p-deep-800);
+    --color-surface-inverse: var(--p-deep-100);
+    --color-overlay: rgb(0 0 0 / 0.65);
+    --color-border: var(--p-deep-700);
+    --color-border-strong: var(--p-deep-500);
+    --color-divider: var(--p-deep-750);
+    --color-text: var(--p-deep-100);
+    --color-text-muted: var(--p-deep-300);
+    --color-text-subtle: var(--p-deep-500);
+    --color-text-inverse: var(--p-deep-900);
+    --color-text-link: var(--p-deep-200);
+    --color-accent: var(--p-deep-300);
+    --color-accent-hover: var(--p-deep-200);
+    --color-accent-soft: var(--p-deep-700);
+    --color-accent-border: var(--p-deep-500);
+    --color-accent-text: var(--p-deep-200);
+    --color-on-accent: var(--p-deep-900);
+    --color-on-danger: var(--p-ink-0);
+    --color-focus-ring: var(--p-deep-300);
+    --color-success-fg: var(--p-mint-300);
+    --color-success-bg: rgb(127 203 159 / 0.12);
+    --color-success-border: rgb(127 203 159 / 0.3);
+    --color-warning-fg: var(--p-gold-300);
+    --color-warning-bg: rgb(221 176 112 / 0.12);
+    --color-warning-border: rgb(221 176 112 / 0.3);
+    --color-danger-fg: var(--p-red-300);
+    --color-danger-bg: rgb(230 59 59 / 0.14);
+    --color-danger-border: rgb(246 107 107 / 0.35);
+    --color-danger-solid: var(--p-red-600);
+    --color-info-fg: var(--p-deep-200);
+    --color-info-bg: rgb(147 177 166 / 0.1);
+    --color-info-border: rgb(147 177 166 / 0.3);
+    --color-neutral-fg: var(--p-deep-300);
+    --color-neutral-bg: var(--p-deep-750);
+    --color-neutral-border: var(--p-deep-700);
+    --color-class-negative: var(--p-mint-300);
+    --color-class-negative-soft: rgb(127 203 159 / 0.14);
+    --color-class-positive: var(--p-gold-300);
+    --color-class-positive-soft: rgb(221 176 112 / 0.14);
+    --color-model-svm: var(--p-deep-200);
+    --color-model-svm-soft: rgb(147 177 166 / 0.1);
+    --color-model-qsvm: var(--p-tide-400);
+    --color-model-qsvm-soft: rgb(76 155 176 / 0.14);
+    --color-on-model: var(--p-deep-900);
+    --color-chart-mmse: var(--p-deep-200);
+    --color-chart-cdr: var(--p-gold-300);
+    --color-chart-grid: var(--p-deep-700);
+    --shadow-xs: none;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 8px 24px rgb(0 0 0 / 0.45);
+    --shadow-lg: 0 16px 40px rgb(0 0 0 / 0.55);
+  }
 }
 
 /* ------------------------------------------------------------------------- */
-/* 2c. SEMANTIC — print. Paper is always light, whatever theme is on screen.  */
-/*     (:not(#id) raises specificity above both dark-theme selectors.)       */
+/* 2c. SEMANTIC — print. The dark theme is screen-only, so paper already gets */
+/*     every light role; this only whitens the page and wells for ink.       */
 /* ------------------------------------------------------------------------- */
 @media print {
   html:not(#print-light) {

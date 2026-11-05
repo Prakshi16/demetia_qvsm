@@ -27,6 +27,7 @@ import { api } from "../api/client";
 import PatientList from "../components/PatientList";
 import { useAuth } from "../auth/useAuth";
 import { slugLocalPart, validatePassword, validatePersonName } from "../utils/validate";
+import FieldError from "../components/ui/FieldError";
 
 const ROLE_LABEL = {
   clinician: "Clinician",
@@ -265,6 +266,18 @@ function AdminDashboard({ name, staff, onStaffAdded }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [credential, setCredential] = useState(null);
   const [domain, setDomain] = useState("");
+  const [touched, setTouched] = useState({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
+  // Same rule as the patient form: "required" waits for submit; format errors
+  // show once a field has been left with something in it.
+  const fieldErrors = {
+    name: validatePersonName(form.name),
+    temporary_password: validatePassword(form.temporary_password),
+  };
+  const shown = (field) =>
+    ((submitAttempted || (touched[field] && form[field].trim() !== "")) && fieldErrors[field]) || null;
+  const touch = (field) => () => setTouched((current) => ({ ...current, [field]: true }));
 
   useEffect(() => {
     api
@@ -284,11 +297,8 @@ function AdminDashboard({ name, staff, onStaffAdded }) {
     event.preventDefault();
     setError("");
     setCredential(null);
-
-    const nameError = validatePersonName(form.name);
-    const pwError = validatePassword(form.temporary_password);
-    if (nameError) return setError(nameError);
-    if (pwError) return setError(pwError);
+    setSubmitAttempted(true);
+    if (fieldErrors.name || fieldErrors.temporary_password) return;
 
     setIsSubmitting(true);
     try {
@@ -299,6 +309,8 @@ function AdminDashboard({ name, staff, onStaffAdded }) {
       });
       setCredential({ email: created.email, password: form.temporary_password });
       setForm(EMPTY_STAFF_FORM);
+      setTouched({});
+      setSubmitAttempted(false);
       onStaffAdded();
     } catch (submitError) {
       setError(submitError.message);
@@ -423,10 +435,13 @@ function AdminDashboard({ name, staff, onStaffAdded }) {
               type="text"
               value={form.name}
               onChange={(event) => updateField("name", event.target.value)}
+              onBlur={touch("name")}
+              aria-invalid={shown("name") ? "true" : undefined}
               autoComplete="off"
               required
               disabled={isSubmitting}
             />
+            <FieldError message={shown("name")} />
           </label>
 
           <label className="field">
@@ -457,11 +472,14 @@ function AdminDashboard({ name, staff, onStaffAdded }) {
                 type="password"
                 value={form.temporary_password}
                 onChange={(event) => updateField("temporary_password", event.target.value)}
+                onBlur={touch("temporary_password")}
+                aria-invalid={shown("temporary_password") ? "true" : undefined}
                 autoComplete="new-password"
                 required
                 minLength={8}
                 disabled={isSubmitting}
               />
+              <FieldError message={shown("temporary_password")} />
             </label>
 
             <label className="field">
